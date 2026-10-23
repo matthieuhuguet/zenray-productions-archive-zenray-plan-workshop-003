@@ -1,0 +1,8 @@
+# _work — la matière, pas le livrable
+
+`regions.json` (les coordonnées), `regions/` (les captures annotées à valider), `crops/` (les
+découpes de référence), `check/` (les comparaisons source/rendu).
+
+Rien ici n'est chargé par l'éditeur. Le livrable du thème, c'est `parts/` + `tokens.css` +
+`theme.json` + `component-registry.json`, et rien d'autre. Séparer les deux évite exactement ce
+qui s'est passé : une racine à onze entrées où l'on ne distinguait plus le produit de l'outillage.
