@@ -1,0 +1,230 @@
+# ZenRayMedia, anatomie du modèle de données
+
+Document d'analyse, écrit après lecture intégrale de `src/zenraymedia/composition.js` (156 lignes),
+`contracts.js` (187), `compile.js` (352), `cut.js` (230) et `document.test.js` (164), plus les
+lectures d'appoint qu'il a fallu faire pour ne rien affirmer sans preuve : `document.js`,
+`htmlTemplate.js`, `componentCatalog.js`, `scripts/zrm-build-theme.mjs`, `composition.test.js`, et
+le fichier `component-registry.json` du thème T-01-1-3. Les fichiers que je n'ai pas ouverts sont
+nommés comme tels quand ils sont cités.
+
+---
+
+## 1. Ce qu'est un document
+
+Un document vit dans un fichier `.zmedia.json` rangé dans le drive, et sa forme d'écriture est
+produite par une seule fonction, `toDocument()`, à `document.js` L48. Elle sérialise exactement
+onze champs, ni plus ni moins, puisque l'objet retourné est littéral.
+
+| Champ | Type | Origine | Remarque |
+|---|---|---|---|
+| `type` | `'zenraymedia'` | constante | `fromDocument()` L67 refuse tout autre valeur en rendant `null` |
+| `v` | `2` | `ZMEDIA_VERSION` L21 | jamais lu au chargement, la lecture est tolérante |
+| `title` | chaîne | `project.brief.title` | doublon de commodité du brief |
+| `path` | chaîne ou `null` | chemin d'enregistrement | |
+| `brief` | objet | contrat 5.1 | validé avant écriture, `saveDocument()` L106 |
+| `notes` | chaîne | texte brut | c'est la matière première du Cut |
+| `cut` | objet ou `null` | contrat 5.2 | |
+| `compositions` | dictionnaire | `{ [themeId]: composition }` | une composition par thème, L57 et L78 |
+| `themeId` | chaîne | défaut `DEFAULT_THEME_ID` | |
+| `formatId` | chaîne | défaut `'F-web-article'` | |
+| `seed` | nombre | défaut `1` | la graine du rendu déterministe |
+
+Le brief, décrit par `emptyBrief()` à `contracts.js` L61, porte `id`, `title`, `message`,
+`audience`, `register`, `intent`, `evidence`, `constraints` avec ses trois sous-champs
+`languages`, `maxDuration`, `mentions`, et `sources`. Sa validation, L68, impose un titre, un
+message d'une seule phrase (le comptage passe par `sentenceCount()` L51, et un message à deux
+phrases est un refus, non un avertissement), un public, un registre et une intention pris dans les
+listes fermées L9 et L10.
+
+Le Cut, construit par `buildCut()` à `cut.js` L79, rend un objet à cinq champs, `id`, `briefId`,
+`beats`, `audio` de forme `{ bed, cues }`, et `locked`. Chaque beat porte `id`, `role` pris dans
+`BEAT_ROLES`, `text`, `slots` (quatre au maximum, `MAX_SLOTS` L190, contrôlé aussi par le contrat
+L97), `weight` compris entre 0 et 1 et `tempo`. Un slot d'image stocke son contenu en `dataUrl`,
+choix commenté à L186, pour que la page compilée reste autonome.
+
+La composition, enfin, est décrite par `emptyComposition()` à `composition.js` L11 :
+
+```js
+{ v: 1, themeId, serial: 0, rows: [ { id, items: [ item, ... ] } ] }
+```
+
+Le champ `serial` est un compteur monotone qui alimente `makeId()` (`contracts.js` L40), lequel
+n'appelle jamais `Date.now()` ni `Math.random()` : deux exécutions identiques donnent les mêmes
+identifiants, ce qui est la condition du rendu rejouable posée en tête de `contracts.js`.
+
+Un élément posé existe sous deux formes, produites par `componentInstance()` L41 et
+`imageInstance()` L59. Le composant porte `id`, `kind: 'component'`, `themeId`, `componentId`,
+`name`, `group`, `hidden`, `locked`, `props`. L'image porte `id`, `kind: 'image'`, `name`,
+`refPath`, `url`, `hidden`, `locked`, `props`. Aucun des deux ne porte de champ d'enfants, et ce
+détail commande toute la section 4.
+
+Il faut noter que `normalizeComposition()` L15 rejette une composition dont le `themeId` ne
+correspond pas à celui demandé et repart d'une composition vide : changer de thème n'écrase donc
+pas le montage de l'ancien, il est simplement rangé sous une autre clé du dictionnaire
+`compositions`.
+
+---
+
+## 2. La carte C1, et si elle dit vrai
+
+La carte C1 affirme trois choses. Le modèle porte déjà `item.props`, il est sérialisé, personne ne
+l'écrit ni ne le lit. Les deux premières sont exactes, la troisième est exacte pour les composants
+mais fausse pour les images.
+
+`props` est créé à trois endroits, et il n'y en a pas d'autres dans le dossier, un `grep` sur
+`props` hors `fonts.js` ne rendant que quatre lignes en tout. `normalizeComposition()` L28 pose
+`props: {}` comme valeur de repli avant l'étalement `...item`, si bien qu'un `props` déjà présent
+dans le fichier survit au rechargement. `componentInstance()` L54 pose `props: {}`.
+`imageInstance()` L71 pose, lui, `props: { fit: 'cover', radius: 18, ratio: '16 / 9' }`.
+
+La sérialisation est acquise sans code dédié, puisque `toDocument()` recopie l'objet
+`compositions` entier : tout ce que porte un item part dans le JSON. Le test d'aller-retour de
+`document.test.js` L60 vérifie bien qu'une composition traverse `toDocument` puis `fromDocument`,
+mais son gabarit L63 ne contient pas de `props`, et l'assertion L73 ne porte que sur
+`componentId`. La propriété est donc sérialisée par construction, sans test qui l'atteste.
+
+La lecture, maintenant. `compile.js` L214 lit `item.props?.ratio` et `item.props?.radius` pour
+produire les deux variables CSS de la figure d'image. Voilà donc un lecteur, et il fonctionne. En
+revanche, la branche des composants, L217 à L227, ne consulte jamais `item.props` : elle appelle
+`renderTemplate(part.body, data)` L221, où `data` est l'objet unique construit L205 pour toute la
+page.
+
+Quant à l'écriture, `patchItem()` (`composition.js` L134) accepte n'importe quel patch, mais
+`MediaApp.jsx` ne l'invoque qu'aux lignes 733 et 734, pour basculer `hidden` et `locked`. Aucun
+appel ne passe `props`. Le fichier n'a pas non plus de panneau Détails, la seule sélection existante
+étant `selectedComponent` (L99), qui sert de cible d'insertion aux lignes 582 et 588.
+
+Le diagnostic de la carte tient donc, avec une correction de formulation. La bonne phrase serait
+que `props` est lu pour les images et ignoré pour les composants, et que rien dans l'interface ne
+l'écrit. Le caractère bloquant est réel, et pour une raison plus dure que celle qu'écrit la carte :
+tant que le rendu d'un composant ne dépend que de `data`, deux instances du même `componentId`
+produisent nécessairement le même HTML, ce qui rend le duplicata inutile et la sélection sans objet.
+
+Une remarque qui n'est pas dans la carte, et qui compte pour son exécution. Le format proposé
+demande que chaque `parts/*.html` déclare ses champs dans son en-tête `<!--zrm …-->`. Cet en-tête
+est bien parsé, `scripts/zrm-build-theme.mjs` L58 en lit le JSON et lève si la syntaxe est
+mauvaise, mais le registre écrit L194 à L202 ne recopie que `id`, `name`, `group`, `role`,
+`reference`, `file` et `standalone`. Un champ `props` déclaré dans l'en-tête serait donc silencieusement
+perdu à la génération, et le catalogue chargé par `loadThemeComponents()` (`componentCatalog.js`
+L38) ne le verrait jamais. La carte demande, sans le dire, une modification du script de build.
+
+---
+
+## 3. Le chemin de `compile()` et le passage de `data`
+
+`compile()` (`compile.js` L291) exige brief, cut, theme et format, puis choisit entre trois voies
+mutuellement exclusives, dans cet ordre.
+
+La première, L303, est retenue dès qu'une composition contient au moins un élément. Elle délègue à
+`composedPage()` L203, qui construit `data` une seule fois L205 sous la forme
+`{ ...templateData(brief, cut, theme, format), dark, scale }`. `templateData()` L266 expose treize
+clés, dont `title`, `message`, `audience`, `themeName`, `readingMinutes` et la liste `beats`
+enrichie. La fonction parcourt ensuite les lignes puis les éléments, saute les éléments masqués
+L212, rend les images en `<figure>` L214, et pour les composants récupère le HTML du catalogue,
+sépare styles et corps par `splitPart()` L194, rend le corps par `renderTemplate(part.body, data)`
+L221 et l'enveloppe dans une `<section class="zrm-lego-item">` portant `data-zrm-instance` et
+`data-zrm-component` L227. Les styles collectés sont concaténés dans une feuille unique L237, avec
+les tokens du thème, et la page sort L258.
+
+La deuxième voie, L309, sert un thème qui porte un gabarit HTML complet. Elle construit son propre
+`data` L310, en y ajoutant `jitter` tiré de `rng(seed)` L293.
+
+La troisième, L318, est la voie historique à tokens : `themeCss()` L86 fabrique la feuille depuis
+les groupes du thème, `beatsHtml()` L181 déroule les beats visibles, et la page est assemblée L333.
+Cette voie ne consulte ni la composition ni `renderTemplate`.
+
+Le point à retenir pour C1 tient en une ligne. `data` est un objet unique, construit avant la
+boucle, passé identique à chaque appel de `renderTemplate`. Le correctif de la carte, écrire
+`renderTemplate(part.body, { ...data, ...item.props })`, est effectivement une modification d'une
+seule ligne, la 221, et sa portée est locale : la fusion se fait dans la portée racine du moteur de
+gabarit, que `renderScope()` (`htmlTemplate.js` L40) propage naturellement aux sections `{{#beats}}`
+en étalant la portée parente L85.
+
+Une réserve, que je pose comme réserve et non comme fait mesuré : le `default` que la carte veut
+mettre dans la déclaration de propriété est lui-même un gabarit, `"{{title}}"`. Si une valeur non
+renseignée est absente de `item.props`, la fusion la laisse absente et le corps du composant, qui
+contient déjà `{{title}}`, continue de lire le brief, donc rien ne casse. Mais si l'interface écrit
+la valeur par défaut dans `item.props` au moment de la sélection, elle y écrit la chaîne
+`"{{title}}"` littérale, et `renderScope` L97 la rendra telle quelle, puisque le moteur ne fait
+qu'une seule passe et n'interprète jamais le résultat d'une substitution, comme le commentaire L30
+le dit explicitement. Le panneau Détails devra donc n'écrire dans `props` que ce que Matthieu saisit
+réellement, ou bien résoudre le `default` par un appel séparé à `renderTemplate` avant de le
+stocker.
+
+---
+
+## 4. Modèle plat ou arborescent
+
+Le modèle est plat, à exactement deux niveaux, et il ne peut pas porter de conteneurs imbriqués. La
+carte C7 du KANBAN dit vrai. Voici où cela se joue, ligne par ligne.
+
+La structure elle-même l'interdit d'abord par omission : `emptyComposition()` L12 pose
+`rows: []`, `newRow()` L85 fabrique `{ id, items: [item] }`, et ni `componentInstance()` L41 ni
+`imageInstance()` L59 ne prévoient de champ d'enfants. Une ligne contient des éléments, un élément
+ne contient rien.
+
+`normalizeComposition()` L22 à L32 verrouille ensuite cette forme en la reconstruisant. Le filtre
+L22 écarte toute ligne dépourvue de tableau `items`, et la reconstruction L25 à L30 recopie chaque
+item par étalement, donc un hypothétique champ `children` survivrait mais ne serait ni normalisé ni
+parcouru. Comme cette fonction est appelée en tête de presque toutes les autres, L89, L104, L116,
+L127, L135, L146, toute structure hors norme est aplanie ou perdue à la première manipulation.
+
+La recherche d'un élément est le point le plus dur. `locate()` L76 à L82 fait deux boucles, sur les
+lignes puis sur `rows[rowIndex].items`, et rend `{ rowIndex, itemIndex }`, un chemin à deux
+entiers. Un arbre demanderait un chemin de profondeur variable. Toutes les opérations reposent sur
+ce couple : `insertItem()` L96 fait un `splice` dans `rows[target.rowIndex].items`, `moveItem()`
+L130 lit `composition.rows[source.rowIndex].items[source.itemIndex]`, `duplicateItem()` L149 fait de
+même. `patchItem()` L138 à L141 et `removeItem()` L120 parcourent `rows.map` puis `items.map` ou
+`items.filter`, sans jamais descendre. `countItems()` L155 additionne `row.items.length`, ce qui
+compte faux dès qu'un item contient autre chose.
+
+Le rendu confirme la contrainte. `composedPage()` boucle sur `composition.rows` L209 puis sur
+`row.items` L210, deux niveaux et pas un de plus, et referme chaque ligne dans un
+`<div class="zrm-lego-row">` L229. La feuille de style suit : `.zrm-lego-row` est une grille
+`repeat(auto-fit, minmax(min(100%,220px),1fr))` L245, c'est-à-dire un seul mode de disposition,
+imposé, sans paramètre de composition. `.zrm-lego-item` porte `min-width:0;overflow:hidden` L246, ce
+qui interdit déjà tout débordement volontaire, donc tout Overlay.
+
+Enfin, `PLACEMENTS` L9 ne connaît que `above`, `below`, `left` et `right`, et `moveItem()` L126
+rejette tout le reste. Il n'existe aucun placement `inside`, qui serait le geste minimal d'un
+éditeur à conteneurs.
+
+---
+
+## 5. Ce qu'il faudrait changer, et ce que cela casserait
+
+Ce qui suit est une proposition de conception, pas un constat. Je n'ai rien implémenté ni mesuré.
+
+Le changement de contrat le plus économe consiste à autoriser un item de `kind: 'container'`
+portant un champ `layout` et un champ `items`, et à ne pas toucher aux lignes, qui deviennent le
+conteneur racine implicite. Le modèle reste sérialisable, `toDocument()` continue de recopier
+l'objet sans modification, et un document ancien reste valide puisqu'il ne contient aucun
+conteneur. Le champ `layout` porterait le mode, `stack` horizontal ou vertical, `grid`, `overlay`,
+et ses paramètres, écart, alignement, colonnes, en réutilisant `props` plutôt qu'en inventant un
+troisième emplacement.
+
+Ce que cela impose, dans l'ordre de la difficulté croissante. `normalizeComposition()` doit devenir
+récursive et normaliser les enfants comme elle normalise les items de ligne. `locate()` doit rendre
+un chemin, tableau d'indices, et non plus un couple, ce qui oblige à réécrire les six fonctions qui
+consomment son résultat. `PLACEMENTS` doit accueillir `inside`, et `insertItem()` doit savoir
+insérer dans un conteneur au lieu de scinder une ligne. `patchItem`, `removeItem` et `countItems`
+doivent descendre. `composedPage()` doit devenir une fonction récursive de rendu d'un item, et le
+CSS doit produire une classe de disposition par mode au lieu de la seule grille imposée L245.
+
+Ce que cela casse, en regardant ce qui existe vraiment. Les trois tests de `composition.test.js`
+lisent `value.rows[0].items[0].id` en dur, ils continuent de passer tant qu'aucun conteneur n'est
+posé, mais ils ne couvrent plus le nouveau chemin. `document.test.js` L73 lit
+`compositions['T-01-1-3'].rows[0].items[0].componentId` et resterait vert pour la même raison. Le
+sélecteur de rendu de `compile()` L303, `composition?.rows?.some((row) => row.items?.length)`, reste
+juste puisqu'un conteneur vide dans une ligne rend quand même `items.length` non nul, mais le calcul
+de `shown` L305, qui additionne `row.items.length`, deviendrait faux. Le rendu `data-zrm-instance`
+L214 et L227 reste bon, ce qui veut dire que la carte C2 n'est pas menacée par C7.
+
+La vraie casse est ailleurs, et elle est humaine plutôt que technique. Un arbre change la structure
+de tous les gestes de l'éditeur, du glisser vers une cible au calcul d'un aperçu, et il le fait dans
+un fichier, `MediaApp.jsx`, qui compte déjà 1158 lignes. L'ordre du KANBAN, qui place C7 en dernier,
+me paraît juste pour cette raison, et je ne vois rien dans les fichiers lus qui inciterait à le
+renverser. En revanche, un point mérite d'être tranché avant C1 plutôt qu'après : si `props` doit un
+jour porter aussi les paramètres de disposition d'un conteneur, autant que le panneau Détails de C1
+soit écrit dès le départ comme un éditeur de `props` générique, piloté par une déclaration, et non
+comme une liste de champs codés en dur.

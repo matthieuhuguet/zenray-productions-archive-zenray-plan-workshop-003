@@ -1,0 +1,180 @@
+# Traceabilité de l'audit
+
+## Périmètre
+
+L'audit commence sur le commit stable `ad44be3`, poursuit les cartes PowerPoint qui sont intégrées
+pendant sa rédaction, puis fixe son verdict sur le dernier commit stable indiqué dans la section
+Vérifications finales. Les modifications non commitées d'un autre travail sont lues comme « en
+cours observé », jamais comme capacité acquise.
+
+Seuls les fichiers de ce dossier d'audit et le lien de `docs/zenraymedia/README.md` appartiennent à
+l'audit. Aucun fichier sous `src/`, `scripts/`, `Scripts/`, `public/` ou les thèmes n'est modifié.
+
+L'utilisateur exclut l'inspection navigateur. Les constats visuels sont donc des inférences tirées
+du JSX, du CSS et des contrats ; les constats fonctionnels proviennent du code, des tests et des
+commandes. Chaque point qui exige un navigateur est nommé comme preuve manquante.
+
+## Sources de vision et de décision
+
+Les documents suivants sont lus intégralement lorsqu'ils sont canoniques ou uniques :
+
+- `PROGRESS.md` ;
+- `CLAUDE.md` et `docs/INDEX-ERREURS-FEATURES.md` ;
+- `docs/zenraymedia/README.md`, `VISION.md` et `KANBAN.md` ;
+- `00-PROMPT-REFINED.md`, `01-PLAN.md`, `02-RISQUES-THINK-OF-EVERYTHING.md` ;
+- `03-UI-CONTRAT-COMPOSANTS.md`, `04-WBS-COMPOSANTS.md`, `06-ETAT-WBS.md` ;
+- `07-PROMPT-THEME-DEPUIS-CAPTURES.md` et `08-EDITEUR-A-FAIRE.md` ;
+- la série complète `docs/zenraymedia/v1/`, y compris les trois attaques 08 et `PLAN-V1.md` ;
+- `_source-matthieu/README.md` et `ZenRayMedia_Prompt_V3.md` ;
+- `src/zenraymedia/themes/README.md` ;
+- le README, l'index, le manifeste et les listes du Volume A corrigé.
+
+Les quatre catalogues `05-THEMES-1024-A/B/C/D.md`, les 256 prompts du Volume A, les ateliers et les
+milliers de références visuelles sont contrôlés par inventaire, identifiants, structure, recherche
+transverse et échantillons représentatifs. Répéter mot à mot 1 024 fiches issues du même gabarit
+n'ajoute aucune preuve ; vérifier l'unicité, les familles, les manques et leur raccordement au
+runtime en ajoute une.
+
+## Code lu
+
+Tous les modules racine de `src/zenraymedia` entrent dans la revue :
+
+- interface : `MediaApp.jsx`, `CreateBrowser.jsx`, `media.css` ;
+- modèle : `composition.js`, `layers.js`, `nodes.js` ; les comportements Lego et layout sont
+  notamment fixés par `lego.test.js` et `layout.test.js`, sans modules homonymes ;
+- compilation : `compile.js`, `htmlTemplate.js`, `cut.js`, `layout.test.js` ;
+- contrats : `contracts.js`, `formats.js`, `declensions.js`, `taxonomy.js` ;
+- persistance : `store.js`, `document.js` ;
+- sorties : `exporters.js`, `forge.js`, `publish.js` ;
+- qualité : `critic.js` et les onze fichiers de tests ;
+- thèmes : `themes/registry.js`, `componentCatalog.js`, `themeFonts.js`, `fonts.js`, les sept
+  registres de composants, leurs 210 parts, leurs tokens et leurs manifestes associés.
+
+Le raccordement est suivi dans `src/App.jsx` et `src/create/node.js`, notamment la création encore
+écrite en version 1, l'ouverture d'un `.zmedia.json` et les événements globaux de navigation.
+
+Les outils `zrm-*` des dossiers `scripts/` et `Scripts/`, les générateurs de thème et de Spotify,
+les outils de police, crop, palette, inventaire, comparaison et vérification sont inventoriés et
+leurs responsabilités parcourues. Les deux dossiers contiennent au moment de l'audit deux copies
+identiques des mêmes outils, ce qui crée une source future de dérive et contredit la convention
+globale qui réserve les scripts à `Scripts/`.
+
+## Méthode
+
+1. lire la vision la plus récente sans effacer les visions précédentes ;
+2. inventorier documents, thèmes, composants, formats, polices, tests et scripts ;
+3. tracer chaque famille des six logiciels vers une branche de code et un test ;
+4. séparer présence, test, intégration, validation et aptitude à produire ;
+5. suivre les données depuis la création jusqu'à l'enregistrement, la compilation, l'export et la
+   publication ;
+6. rechercher les divergences de vocabulaire, métrique, version et source de vérité ;
+7. examiner sécurité, reprise, accessibilité et performance à chaque frontière ;
+8. repasser de la vision aux résultats utilisateur afin de détecter les fonctions absentes des
+   tableaux logiciels ;
+9. écrire les propositions hors du code applicatif ;
+10. vérifier liens, diff, tests, build et journal avant clôture.
+
+Les recommandations de simplification suivent `karpathy-guidelines`. Le prémortem transverse suit
+`think-of-everything`. Le contexte du dépôt suit `zenrayprogress-context`. Ces skills conduisent en
+particulier à préférer la tranche verticale de publication à une extension simultanée des six
+surfaces logicielles.
+
+## Commandes de mesure
+
+Les contrôles principaux comprennent :
+
+```text
+git status --short
+git log --oneline
+git ls-files src/zenraymedia
+find docs/zenraymedia ...
+rg sur les statuts, familles, formats, exports, persistance et événements
+compte unique des identifiants T-FF-S-V dans les quatre catalogues
+contrôle Node des liens Markdown relatifs
+npx vitest run src/zenraymedia --reporter=dot
+npm run build
+git diff --check
+```
+
+Le contrôle initial des 421 Markdown ne trouve aucun lien relatif cassé. La première exécution
+stable de la suite ZenRayMedia, avant les cartes PowerPoint en cours d'ajout, exécute 402 tests dans
+10 fichiers et les réussit. Le build Vite réussit. Les avertissements observés sont consignés dans
+la section suivante puis revérifiés sur l'état final.
+
+## Limites et faits à ne pas surinterpréter
+
+- aucun navigateur n'est ouvert, conformément à la demande ;
+- une lecture statique du sandbox prouve une contradiction de configuration, mais seul Playwright
+  prouve son effet exact dans chaque navigateur ;
+- les énormes corpus de captures sont inventoriés et reliés, non jugés image par image ;
+- une porte Vitest verte ne prouve ni fidélité PNG/PDF ni validation utilisateur ;
+- les contraintes de plateforme sociale peuvent changer, et doivent être revérifiées auprès de
+  sources officielles au moment de leur implémentation ;
+- le code évolue en parallèle, aussi chaque chiffre final doit être lu avec le commit de clôture ;
+- les matrices Miro et Illustrator suivent désormais leurs huit familles écrites dans le KANBAN ;
+  leurs ratios décrivent des décisions de carte, non des capacités prêtes ; le brouillon InDesign
+  apparu ensuite est exclu par la dernière instruction de périmètre.
+
+## Traçabilité des conclusions majeures
+
+| Conclusion | Preuve principale |
+|---|---|
+| La vision demande une galerie, non le seul éditeur | `VISION.md`, vision II |
+| Instagram et LinkedIn passent avant les plans et textures | `VISION.md`, ordre des usages et report de trois mois |
+| Le bouton Publier ne publie pas le visuel | `MediaApp.jsx::publishNow` vers `publish.js::publishArticle` |
+| Changer de projet conserve une partie de l'ancien contexte | `themeId`, `formatId`, sélection et association Create sont des états globaux ; la liste des projets ne restaure que `currentId` |
+| Les formats modifient la source | effet de changement de `formatId` et `layers.js::applyConstraintsToAll` |
+| Les slides ne sont pas des pages complètes | `readSlides`, groupes dédiés, rows Lego hors de ce modèle |
+| Le connecteur Miro est global et garde un fond de forme | `createConnector` vers `addLayer` sans `groupId` ; wrapper `.zrm-layer-shape` et CSS de fond |
+| La suppression d'un bout ne fige pas une ligne | `readLayers` vide la référence ; `estConnecteur` exige les deux références |
+| Les groupes de slides restent destructibles comme dossiers | hiérarchie de `MediaApp.jsx`, `groupLayers`, `ungroupLayers`, `removeGroup` et `readSlides` |
+| L'historique se remplit pendant un glisser | handlers de pointeur vers `patchComposition` et pile bornée à 50 |
+| L'iframe ne permet pas le script injecté | `compile.js` injecte le bridge ; `MediaApp.jsx` pose `sandbox="allow-same-origin"` |
+| L'export PNG/PDF n'est pas un artefact prouvé | `exporters.js::exportPng` et `exportPdf` |
+| La galerie de publications n'existe pas | seulement store projets, navigateur Create et état React `published` |
+| Les 1 024 thèmes sont surtout documentaires | quatre catalogues contre huit entrées de `listThemes()` |
+| Le paquet de thème n'a pas une source unique | registry par nom, header HTML, `theme.json`, component registry et tokens manuels |
+| La validation du thème ne garantit pas sa compilation | `validateTheme` superficiel ; lectures directes de `chrome`, `motion` et champs imbriqués dans `compile.js` |
+| Le contrôle de gabarit annoncé n'est pas branché | `inspectTemplate` n'est appelé que par les tests, jamais par `loadTheme` |
+| I7 ne garantit pas un fichier autonome | `embedImages` conserve l'URL après CORS ou réseau, parse seulement certains `img`, met en cache les échecs et n'impose aucun délai maximal |
+| Un Cut peut naître du thème précédent | `themeId` change avant que l'effet `loadTheme` remplace l'objet `theme` ; l'effet de montage automatique ne vérifie pas leur identité |
+| Vingt formats manquent à la vue globale | 27 entrées dans `FORMATS`, sept dans `DECLENSION_GROUPS` |
+| Le statut documentaire dérive | KANBAN S5/S6 et L7/L8 contre commits et code ; VISION contre Figma/PowerPoint |
+| Aucun E2E ZenRayMedia n'existe | recherche dans les suites Playwright du dépôt |
+
+## Vérifications finales
+
+Les chiffres suivants portent sur une archive propre du commit stable `2156228`, après fermeture
+documentaire d'Illustrator I1 à I8 et ajout de l'incorporation I7. L'archive évite que les fichiers
+Plan et les documents d'audit non suivis gonflent les preuves du code publié.
+
+- Commit stable final : `2156228` (`ZenRayMedia — Illustrator 8/8 : I3 à I8, images incorporées à
+  l'export`).
+- Fichiers applicatifs modifiés par l'audit : aucun.
+- Tests ZenRayMedia : 498 réussis dans 11 fichiers, en 91,40 s.
+- Suite globale : 771 tests réussis dans 58 fichiers, en 86,91 s.
+- Build Vite : réussi en 9,16 s ; avertissements de découpage dynamique et chunks supérieurs à
+  500 Ko, dont `MediaApp` à environ 796,66 Ko minifié et un thème à environ 1 393,89 Ko.
+- Avertissements encore visibles : `localStorage` expérimental sous Node, valeur CSS `left` égale
+  à `NaN` dans un test ZenRayMedia et trois assertions asynchrones non attendues dans
+  `folderMosaic.test.js`, hors ZenRayMedia.
+- Liens Markdown : 432 fichiers contrôlés, 15 liens relatifs, aucun lien cassé.
+- Matrice fonctionnelle : 48 lignes distinctes, soit huit pour chacun des six logiciels.
+- Inventaire : 233 exports nommés dans vingt modules ; 17 598 lignes JS, JSX et CSS sous
+  `src/zenraymedia`.
+- Dossier externe : onze Markdown et 2 875 lignes, index compris.
+- `git diff --check` et contrôle équivalent des documents non suivis : aucune erreur d'espace.
+- `PROGRESS.md` : entrée append-only ajoutée après ces portes.
+
+## Couverture de la demande
+
+| Demande | Livrable |
+|---|---|
+| Toute la vision contre le code actuel | `01-VISION-ET-ECARTS.md` |
+| Tous les logiciels et huit familles | `02-MATRICE-6-LOGICIELS-8-FAMILLES.md` |
+| Failles et améliorations de code | `03-CODE-ARCHITECTURE-DONNEES.md` |
+| Proposition UX/UI intégrale et clics | `04-UX-UI-PARCOURS.md` |
+| Documentation, thèmes, formats et tests manquants | `05-DOCUMENTATION-THEMES-TESTS.md` |
+| Génération future de code, sans l'écrire | lots G0 à G11 et `06-BACKLOG-PRIORISE.md` |
+| Aucun code applicatif modifié | diff final et présente trace |
+| Audit externe relié à l'index | lien ajouté à `docs/zenraymedia/README.md` |

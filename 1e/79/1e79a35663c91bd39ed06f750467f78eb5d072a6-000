@@ -1,0 +1,4 @@
+// /folder — voir functions/_shareRoute.js pour le pourquoi et le comment.
+import { partage } from './_shareRoute.js'
+
+export const onRequest = partage('folder')

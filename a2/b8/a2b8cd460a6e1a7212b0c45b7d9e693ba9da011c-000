@@ -1,0 +1,288 @@
+# Inventaire des micro-fonctions et de leur intégration
+
+Ce registre part du code au lieu de partir des annonces. Il compte chaque export nommé du domaine,
+relie les cartes récentes à leurs primitives, puis distingue ce qui possède seulement une fonction,
+ce qui atteint l'interface, ce qui est testé et ce qui produit réellement un livrable. Un export
+n'est pas automatiquement une fonction utilisateur, et un bouton n'est pas automatiquement une
+intégration finie.
+
+## Surface mesurée
+
+La colonne décrit le commit `2156228`, publié le 6 août à 04:24 JST. Il porte 233 exports nommés :
+les 223 du socle précédent, les neuf primitives de chemin Illustrator I2 et `embedImages` pour I7.
+
+| Élément | Valeur |
+|---|---:|
+| Code sous `src/zenraymedia`, tests et CSS compris | 17 598 lignes |
+| `MediaApp.jsx` | 3 589 lignes |
+| Modules de domaine et registre de thèmes avec exports nommés | 20 |
+| Exports nommés | 233 |
+| États React dans `MediaApp.jsx` | 57 `useState` |
+| Effets, mémos et callbacks | 23 `useEffect`, 24 `useMemo`, 34 `useCallback` |
+| Contrôles JSX bruts | 111 boutons, 37 inputs, 14 selects, 5 textareas |
+| Gestionnaires de clic | 124 `onClick` |
+| Gestionnaires de pointeur | 19 |
+| Libellés d'accessibilité et infobulles | 53 `aria-label`, 84 `title` |
+| Onglets de l'éditeur | 7 |
+| Commandes statiques de la palette | 17 |
+| Commandes de format et de thème | 27 + 8 |
+| Composants dynamiques proposés par le thème actif | 25 à 48 |
+
+Ces chiffres ne condamnent pas à eux seuls le composant principal. Ils prouvent cependant qu'un
+même fichier coordonne désormais stockage, document, scène, gestes, commandes, export et shell ;
+une correction de page ou de publication peut donc traverser plusieurs états locaux sans frontière
+transactionnelle.
+
+## Registre exhaustif des 233 exports de la photographie
+
+La liste suivante couvre tous les exports nommés des modules de domaine et de
+`themes/registry.js`, y compris les dix ajouts Illustrator I2 et I7. Elle sert de base reproductible à
+toute future matrice de capacité.
+
+| Module | Nombre | Exports |
+|---|---:|---|
+| `compile.js` | 9 | `readingTimeOf`, `shrinkFactor`, `nextShrink`, `MIN_SHRINK`, `visibleBeats`, `omittedCount`, `resolveItemData`, `templateData`, `compile` |
+| `componentCatalog.js` | 2 | `loadThemeComponents`, `groupComponents` |
+| `composition.js` | 14 | `COMPOSITION_VERSION`, `PLACEMENTS`, `emptyComposition`, `normalizeComposition`, `componentInstance`, `imageInstance`, `insertItem`, `addComponent`, `addImage`, `removeItem`, `moveItem`, `patchItem`, `duplicateItem`, `countItems` |
+| `contracts.js` | 21 | `REGISTERS`, `INTENTS`, `BEAT_ROLES`, `BEAT_TEMPOS`, `ROLE_LABELS`, `rng`, `hashString`, `makeId`, `sentenceCount`, `emptyBrief`, `validateBrief`, `validateCut`, `THEME_GROUPS`, `validateTheme`, `FORMAT_KINDS`, `validateFormat`, `validateJob`, `validateDeliverable`, `validate`, `isValid`, `checksumOf` |
+| `critic.js` | 8 | `SEVERITY`, `parseColor`, `relativeLuminance`, `composite`, `contrastRatio`, `inspectStatic`, `inspectRendered`, `summarize` |
+| `cut.js` | 20 | `splitIntoBlocks`, `roleForPosition`, `buildCut`, `refitCut`, `moveBeat`, `mergeBeats`, `splitBeat`, `updateBeat`, `removeBeat`, `addBeat`, `MAX_SLOTS`, `addSlot`, `removeSlot`, `moveSlot`, `slotsWeight`, `countSlots`, `ROLE_OPTIONS`, `OPENING`, `MIDDLE`, `CLOSING` |
+| `declensions.js` | 5 | `DECLENSION_GROUPS`, `declensionState`, `declensionTree`, `declensionSummary`, `trimAdvice` |
+| `document.js` | 15 | `ZMEDIA_EXT`, `ZMEDIA_VERSION`, `DEFAULT_MEDIA_DIR`, `isZMediaPath`, `slugify`, `suggestPath`, `toDocument`, `fromDocument`, `loadDocument`, `saveDocument`, `listFolders`, `listDocuments`, `crumbsOf`, `parentOf`, `dirOf` |
+| `exporters.js` | 8 | `embedFonts`, `embedImages`, `downloadBlob`, `exportHtml`, `exportPng`, `exportPdf`, `copyText`, `safeFileName` |
+| `fonts.js` | 8 | `FONTS`, `FONTS_BY_FAMILY`, `fontsOfArchetype`, `fontStack`, `missingFamilies`, `fontFaceCss`, `essentialFaces`, `fontsWeight` |
+| `forge.js` | 5 | `ffmpegCommand`, `probeCommand`, `renderScript`, `forgePlan`, `formatBytes` |
+| `formats.js` | 7 | `FORMATS`, `FORMATS_BY_ID`, `getFormat`, `isTemporal`, `aspectOf`, `durationOf`, `beatDuration` |
+| `htmlTemplate.js` | 3 | `escapeHtml`, `renderTemplate`, `inspectTemplate` |
+| `layers.js` | 71 | `LAYER_KINDS`, `SHAPE_TYPES`, `LIST_STYLES`, `ANIMATION_STYLES`, `CONSTRAINTS_H`, `CONSTRAINTS_V`, `BLEND_MODES`, `EFFECT_KEYS`, `FILL_TYPES`, `fillOf`, `safeHref`, `animationOf`, `LAYER_STYLES`, `styleOf`, `emptyEffects`, `makeLayer`, `resizeTableCells`, `readLayers`, `paintOrder`, `stackOrder`, `addLayer`, `patchLayer`, `removeLayer`, `duplicateLayer`, `reorderLayer`, `moveLayerTo`, `resizeLayerTo`, `countLayers`, `findLayer`, `filterOf`, `applyHandle`, `snapMove`, `frameBox`, `transformOf`, `shapeClipPath`, `pathD`, `createPathLayer`, `pathPointsInPixels`, `movePathAnchor`, `movePathHandle`, `removePathPoint`, `insertPathPoint`, `toggleAnchorSmoothness`, `nearestPointOnTrace`, `resizedColumn`, `layersInRect`, `alignPatch`, `bringToFront`, `sendToBack`, `distributePatch`, `readGroups`, `groupLayers`, `ungroupLayers`, `patchGroup`, `removeGroup`, `readSlides`, `addSlide`, `removeSlide`, `duplicateSlide`, `reorderSlide`, `setActiveSlide`, `isEffectivelyHidden`, `isEffectivelyLocked`, `connectorGeometry`, `createConnector`, `applyConnectors`, `applyConstraints`, `applyConstraintsToAll`, `toggleAutoLayout`, `setAutoLayoutProp`, `applyAutoLayout` |
+| `nodes.js` | 8 | `NODE_STYLES`, `parseTree`, `findNode`, `pathOfElement`, `applyOverrides`, `countNodes`, `collectTexts`, `allPaths` |
+| `publish.js` | 4 | `toMarkdown`, `publishPathFor`, `pageUrlFor`, `publishArticle` |
+| `store.js` | 9 | `SEED_NOTES`, `seedProject`, `loadProjects`, `saveProjects`, `loadCurrentId`, `saveCurrentId`, `appendLog`, `loadLog`, `clearLog` |
+| `taxonomy.js` | 6 | `FAMILIES`, `FAMILY_REGISTER`, `THEME_ID_RE`, `parseThemeId`, `isThemeId`, `parseThemeFileName` |
+| `themeFonts.js` | 4 | `SUBFAMILY_FONTS`, `defaultFontFor`, `subfamiliesUsing`, `DISTINCT_FONTS` |
+| `themes/registry.js` | 6 | `listThemes`, `listFamilies`, `findEntry`, `readThemeHeader`, `loadTheme`, `DEFAULT_THEME_ID` |
+
+## Exports sans appel de production
+
+Dix-sept symboles exportés n'ont aucun appel dans le code de production ; parmi eux, huit ne sont
+appelés par aucun test non plus. Cette mesure ne signifie pas que les 17 doivent être supprimés :
+un helper pur peut constituer une API volontaire. Elle distingue toutefois les contrats promis mais
+non branchés des commodités simplement testées.
+
+| Symbole | Tests | Lecture |
+|---|---:|---|
+| `THEME_GROUPS` | 0 | Taxonomie publique sans consommateur |
+| `isValid` | 5 | Helper générique exercé seulement comme API unitaire |
+| `moveSlot` | 2 | Commande Cut sans geste d'interface |
+| `ROLE_OPTIONS` | 0 | Liste exportée sans consommateur |
+| `suggestPath` | 5 | Helper de document testé, chemin proposé ailleurs par une autre logique |
+| `fontsOfArchetype` | 2 | Recherche de police sans parcours utilisateur |
+| `aspectOf` | 0 | Dérivation de format non employée |
+| `inspectTemplate` | 3 | Validation annoncée mais jamais branchée au chargement d'un thème |
+| `EFFECT_KEYS` | 0 | Métadonnée exportée sans consommateur |
+| `moveLayerTo` | 2 | Primitive de calque testée, non appelée par l'application |
+| `resizeLayerTo` | 2 | Primitive de calque testée, non appelée par l'application |
+| `pathOfElement` | 2 | Helper DOM testé, non utilisé par l'édition courante |
+| `FAMILY_REGISTER` | 0 | Registre taxonomique sans consommateur |
+| `isThemeId` | 0 | Garde d'identifiant sans appel |
+| `subfamiliesUsing` | 2 | Requête de police seulement testée |
+| `DISTINCT_FONTS` | 0 | Vue calculée sans consommateur |
+| `listFamilies` | 0 | API du registre sans interface ni test |
+
+`inspectTemplate` est le cas le plus important : sa présence donne l'impression que les gabarits
+sont contrôlés, tandis que `loadTheme` ne l'appelle jamais. `moveSlot` montre un autre type d'écart,
+où le modèle possède une action que l'interface ne permet pas d'atteindre.
+
+## Chaîne fonctionnelle réelle
+
+| Domaine | Micro-fonctions présentes | Intégration actuelle | Manque qui empêche l'aptitude à produire |
+|---|---|---|---|
+| Liste de projets | seed, chargement, sauvegarde, projet courant | `store.js` et état React | Erreurs de quota ignorées, pas d'autosave, état global non isolé par projet |
+| Fichier `.zmedia.json` | conversion, normalisation, lecture, écriture, navigation | `document.js`, `CreateBrowser.jsx`, événement global depuis `App.jsx` | `App.jsx` crée encore `v:1` tandis que le document courant vaut 2 ; aucune migration ni sauvegarde atomique |
+| Association Create | chemin, SHA, publication Markdown | Trois états locaux globaux | Une cible peut survivre au changement de projet et recevoir le mauvais document |
+| Brief | intention, registre, validation | Ancienne zone éditoriale | Ne représente ni page, ni variante, ni livraison sociale |
+| Cut | beats, slots, ordre, fusion, coupe, ajustement | Éditeur et compilateur historiques | Critique et publication restent centrés sur le Cut plutôt que sur la scène et ses artefacts |
+| Composition Lego | lignes, composants, images, ordre, copie | `composition.js` puis `compile.js` | Coexiste avec les calques ; n'appartient pas proprement à une page |
+| Scène de calques | cinq genres, géométrie, style, pile | `layers.js`, canevas et hiérarchie | Pas de schéma versionné de scène ni d'identité de page canonique |
+| Groupes | contiguïté, masque, verrou, Auto Layout | Dossiers dans la hiérarchie | Pas de boîte, transformation collective ou distinction sûre des groupes système |
+| Diapositives | ajout, copie, suppression, ordre, active | Groupe spécialisé | Ne couvre pas les pièces Lego ; opérations de groupe peuvent casser la page |
+| Sélection | simple, multiple, inversion, rectangle | Canevas et hiérarchie | Visibilité effective et page non partagées par tous les gestes |
+| Transformation | glisser, redimensionner, rotation, flip, alignement, distribution | Gestes directs et panneau | Une entrée d'historique et une sauvegarde par mouvement de pointeur |
+| Contraintes | ancrage horizontal et vertical | Recalcul lors du changement de format | Réécrit la source au lieu de calculer une variante |
+| Auto Layout | ligne, colonne, écart, ancre | Recalcul après mutation | Groupe sans dimension, padding, alignement croisé, Hug ou Fill |
+| Texte | contenu, style, liste, lien, édition en place | Calque texte et textarea superposée | Fidélité de métriques, texte riche, langue et accessibilité non prouvées |
+| Images | URL, point focal, `cover`, tentative d'incorporation à l'export | Calque image, actifs Create et `embedImages` | Provenance, licence, EXIF, résolution, alt, état lié/incorporé, délai et ressource stable absents ; CORS garde silencieusement l'URL |
+| Formes | rectangle, ellipse, ligne, polygone, étoile | CSS et `clip-path` | Pas d'opération booléenne, de pile d'apparences ou d'import SVG sûr |
+| Tracés vectoriels I2 | points, poignées Bézier, ouverture, fermeture, insertion, suppression | Calque `shape` rendu en SVG et outil Plume au commit `5ceae3a` | Coordonnées, transaction du geste, boîte, verrouillage, insertion de courbe et preuve visuelle restent fragiles |
+| Tableaux | grille 1 à 8, cellules conservées au resize | Cinquième genre de calque et rendu `<table>` | Entêtes, caption, collage, styles, données liées et preuve accessible absents |
+| Apparence | couleur, dégradé, contour, opacité, mélanges, filtres, ombre | Style inline du calque | Critique du rendu réel, pile d'apparences et transparence de sortie absents |
+| Animation | fondu, montée, zoom, délai | Wrapper interne dans l'aperçu | Reduced motion de l'iframe, durée globale, ordre, timeline et export absents |
+| Composants HTML | chargement de registre, groupes, instance, overrides | Palette, Lego et calque composant | Contrat de propriétés hétérogène, chemins DOM positionnels, migration et validation absentes |
+| Sous-composants | arbre DOM, sélection, texte et style local | `nodes.js` et panneau Détails | Vingt-quatre textes maximum, champ vide impossible, identité cassée par réorganisation HTML |
+| Post-it | préréglage d'un calque texte | Bouton de création | Sémantique et alignement fiables absents |
+| Connecteur | géométrie entre centres et recalcul | Calque `shape` avec SVG interne | Page, ports, flèches, routage, copie, suppression d'extrémité et rendu de fond incorrects |
+| Thèmes | huit entrées, header, module ou paquet de composants | Chargement asynchrone et palette | Race de thème, contrats multiples, version, migration et validation de ressource absents |
+| Formats | 27 définitions | Sélecteur et compilation | Seulement sept dans l'arbre de déclinaisons ; conversion destructive |
+| Déclinaisons | état, résumé, conseil de coupe | Vue globale pour sept formats | Aucune variante persistante ni QA propre à chaque format |
+| Critique | contraste, densité et contrôles statiques/rendus | Panneau de diagnostic | Mesure encore le Cut et certains sélecteurs, non chaque page et artefact final |
+| HTML | polices et certains `img` embarqués, téléchargement | Export direct | Voies de compilation divergentes ; CORS, CSS, SVG, `srcset`, délais, ressources et isolation non validés |
+| PNG | rasterisation d'un HTML | Export unitaire et boucle de slides | `foreignObject`, fond blanc, ressources non attendues, pas de lot atomique ni QA par page |
+| PDF | impression d'un `srcdoc` | Ouverture du dialogue système | Pas de fichier déterministe, pagination, reçu ou test d'artefact |
+| Vidéo | commande ffmpeg, probe et script | Plan texte copiable | Aucun job exécuté, progression, reprise ou artefact |
+| Publication | Markdown, chemin et URL | Bouton Publier vers Create | Publie le Cut textuel, non le média rendu ; aucun adaptateur Instagram/LinkedIn |
+| Galerie | aucune micro-fonction dédiée | Liste locale de projets seulement | Objet Publication, états, miniatures, versions, filtres et actions absents |
+| Journal | append, lecture, effacement | Log global | Aucun lien stable à un projet, une version, un export ou une publication |
+
+## Les 27 formats et les 20 invisibles
+
+Le moteur déclare les formats suivants :
+
+`F-web-article`, `F-still-1080-square`, `F-still-1080x1350`, `F-still-1080x1920`, `F-print-a4`,
+`F-video-1920x1080`, `F-overlay-1920x1080`, `F-web-og`, `F-web-720p`, `F-web-1440p`,
+`F-web-2160p`, `F-social-1200`, `F-social-2x3`, `F-social-3x4`, `F-header-3x1`, `F-header-4x1`,
+`F-header-2x1`, `F-ad-mpu`, `F-ad-leaderboard`, `F-ad-billboard`, `F-ad-skyscraper`,
+`F-ad-halfpage`, `F-ad-mobile`, `F-print-a5`, `F-print-a3`, `F-web-wide`, `F-web-narrow`.
+
+L'arbre `DECLENSION_GROUPS` n'en montre que les sept premiers, dans Lecture, Réseaux et Écran. Les
+vingt autres ne sont donc pas absents du moteur, mais absents du parcours global de déclinaison :
+les trois web en résolution, les trois sociaux supplémentaires, les trois headers, les sept ads,
+les deux prints supplémentaires et les deux largeurs web.
+
+## Implémentation des familles récentes
+
+### Slate et Photoshop
+
+| Carte | Commit principal | Primitives et interface | Preuve actuelle | Dette d'intégration |
+|---|---|---|---|---|
+| S1 | `b7ddb3d` | sélection, valeurs mixtes, verrou Détails | tests `MediaApp` | Pas d'E2E ni d'état effectif uniforme |
+| S2 | `02f369e` | `applyHandle`, `snapMove`, `frameBox`, `transformOf` | tests `layers` et `MediaApp` | Historique par mouvement, snapping des invisibles |
+| S3 | `61368ba` | tailles de colonnes dans `MediaApp` | tests `MediaApp` | Disposition non persistante |
+| S4 | `52d1782` | menu contextuel et commandes locales | tests `MediaApp` | Pas de registre unique ni navigation complète |
+| S5/S6 | `0653059` | recherche d'actifs, filtre de hiérarchie, réemploi des groupes | tests `MediaApp` | Le KANBAN les marque encore « à faire » |
+| S8 | `51aadb4` | flèches dans la hiérarchie | tests `MediaApp` | Focus et DnD sans équivalent clavier complet |
+| PS1 | `3c60d96` | `layersInRect`, tout sélectionner, inverser | tests `layers` et `MediaApp` | Visibilité/page incohérentes |
+| PS2 | `cd3b53f` | `alignPatch`, `distributePatch`, flip | tests `layers` et `MediaApp` | Transformations non transactionnelles |
+| PS4 | `5597da4` | `SHAPE_TYPES`, `shapeClipPath` | tests de compilation | Formes CSS, non moteur vectoriel |
+| PS5 | `b854892` | `groupLayers`, `ungroupLayers`, masquage, verrou | tests `layers` et `MediaApp` | Groupe sans boîte ; slides fragiles |
+| PS6 | `3bd13d5` | point focal d'image dans `styleOf` | tests de compilation | Aucun vrai recadrage ni contrat d'actif |
+| PS8 | `20eca7e` | piles undo/redo et presse-papiers dans `MediaApp` | tests `MediaApp` | Copie des références et appartenance de page incorrectes |
+
+PS3 et PS7 sont classés comme réemploi du socle, tandis que S7 est explicitement exclu. Cette
+classification évite une fausse recherche de commits qui n'ont jamais été nécessaires.
+
+### Figma
+
+| Carte | Commit principal | Primitives et interface | Preuve actuelle | Dette d'intégration |
+|---|---|---|---|---|
+| F1/F2/F4 | `8fac9c3` | réemploi de sélection/pile ; `toggleAutoLayout`, `setAutoLayoutProp`, `applyAutoLayout` | tests `layers`, `lego`, `MediaApp` | Deux modèles de scène et groupe sans géométrie |
+| F3 | `c4f4cbe` | `applyConstraints`, `applyConstraintsToAll` | tests de géométrie et interface | Mutation destructive au changement de format |
+| F5 | `eae6b8e` | textarea d'édition en place | tests `MediaApp` | Superposition non fidèle au rendu final |
+| F6 | `379e63c` | polygone et étoile paramétriques | tests `layers` et compilation | Aucun chemin éditable |
+| F7 | `d44aef2` | `FILL_TYPES`, `fillOf` | tests de style et interface | Un seul fill et Critique non raccordé |
+| F8 | `95c8b3c` | `parseTree`, `applyOverrides`, édition des instances de calque | tests `nodes` et `MediaApp` | Chemins DOM positionnels et schéma non versionné |
+
+### PowerPoint
+
+| Carte | Commit principal | Primitives et interface | Preuve actuelle | Dette d'intégration |
+|---|---|---|---|---|
+| PP1 | `f8e9a74` | `readSlides`, ajout, copie, suppression, ordre, active | tests `layers` et `MediaApp` | Une slide n'englobe pas toute la scène |
+| PP2 | `ad44be3` | alignement canevas, `bringToFront`, `sendToBack`, ratio Maj | tests unitaires et UI | Groupes et historique héritent des défauts du socle |
+| PP3 | `8723b6c` | `LIST_STYLES`, `safeHref` | tests de modèle, compilation et UI | Listes plates et clic non prouvé en sandbox |
+| PP4 | décision de réemploi | formes, images et Unicode existants | tests antérieurs | Vidéo, son et icônes dédiées exclus |
+| PP5 | `54a72e3` | `resizeTableCells`, rendu `<table>` | tests `layers`, compilation et UI | Accessibilité et données structurées limitées |
+| PP6 | `c62f91f` | `ANIMATION_STYLES`, `animationOf` | tests modèle, HTML et UI | Pas d'artefact temporel ni reduced motion prouvé |
+| PP7 | `823bd9f` | PageUp/PageDown dans `MediaApp` | test UI | État de navigation écrit dans l'historique de contenu |
+| PP8 | `ea4c71d` | boucle de slides vers `exportPng` | test de présence et HTML isolé | Aucun test du téléchargement, ZIP, manifeste, QA ou reprise |
+
+### Miro
+
+| Carte | Commit principal | Primitives et interface | Preuve actuelle | Dette d'intégration |
+|---|---|---|---|---|
+| M1 à M4 | `d95d00e` | réemploi pan, zoom, sélection, gestes et texte | tests antérieurs | Ne prouve pas un canevas infini, lequel est écarté |
+| M5 | `d95d00e` | préréglage Post-it de calque texte | tests `MediaApp` | Style non sémantique et alignement écrasable |
+| M6 | `ef4a3b7` | `connectorGeometry`, `createConnector`, `applyConnectors` | dix tests de modèle et trois tests UI ciblés | Relation globale, fond de forme, suppression/copie/pages défectueuses |
+| M7/M8 | `87a5597` | réemploi de structure ; collaboration exclue | décision documentée | Protection des groupes système et révision asynchrone absentes |
+
+### Illustrator
+
+| Carte | État de la photographie | Primitives et interface | Preuve actuelle | Dette d'intégration |
+|---|---|---|---|---|
+| I1 | commit `f6255b0`, réemploi validé | sélection d'objets, multi-sélection, rectangle et sous-composants existants | KANBAN et tests antérieurs | Isolation et sélection progressive de groupe sont écartées ; la sélection directe d'un tracé dépend d'I2 |
+| I2 | commit `5ceae3a` | neuf exports de chemin, SVG réel, outil Plume, ancres et poignées | 24 déclarations de modèle, 8 d'interface et 493 cas ZenRayMedia verts | Dix-sept défauts de modèle, geste, page, verrouillage et preuve sont détaillés dans le document 10 |
+| I3 à I6, I8 | commit `2156228`, décisions de réemploi ou d'exclusion | aucun changement applicatif pour ces cinq cartes | KANBAN, code antérieur et tests antérieurs | Les mots « déjà couvert » masquent des sous-fonctions absentes ; séparer décision de carte et capacité prête |
+| I7 | commit `2156228` | `embedImages`, câblé dans HTML, PNG et PDF | cinq tests unitaires du helper | Aucun test des exporteurs ni artefact rouvert ; échecs CORS silencieux, parse incomplet, cache et attentes non bornés |
+
+Le commit `5b0676e` annonce Illustrator et InDesign dans `VISION.md`, `f6255b0` indexe I1,
+`5ceae3a` publie I2, puis `2156228` indexe I3 à I8. La liste complète et sa contre-lecture sont
+conservées dans `10-ILLUSTRATOR-30-6.md` afin que le ratio documentaire ne remplace pas la preuve.
+
+## Tests, déclarations et niveau de preuve
+
+Le commit final Illustrator porte la suite ZenRayMedia à onze fichiers et 446 déclarations statiques
+`it`. Elle exécute 498 cas, car deux boucles vérifient chacun des 27 formats, soit 52 cas de plus que
+leurs deux déclarations ; I7 ajoute cinq déclarations dans `exporters.test.js`.
+La suite dédiée du checkout propre passe en 91,40 s ; la suite globale passe en 86,91 s.
+
+La session d'intégration annonce 774 tests globaux sur 59 fichiers, mais ce nombre provient d'un
+arbre sale : il inclut les trois cas de `src/create/planUiConfig.test.js`, fichier concurrent non
+suivi et sans rapport avec ZenRayMedia. Le commit `2156228` contient donc 771 cas sur 58 fichiers ;
+la preuve attribuable au domaine est 498 sur 11.
+
+| Fichier | Déclarations statiques | Domaine principal |
+|---|---:|---|
+| `MediaApp.test.jsx` | 103 | Interface, familles, commandes et états visibles, dont Plume |
+| `componentCatalog.test.js` | 1 | Chargement du registre |
+| `composition.test.js` | 3 | Composition Lego |
+| `document.test.js` | 14 | Document et chemins Create |
+| `exporters.test.js` | 5 | Incorporation I7 au niveau du helper |
+| `layers.test.js` | 196 | Modèle de calques, tracés et presque toutes les cartes récentes |
+| `layout.test.js` | 3 | Compilation et disposition |
+| `lego.test.js` | 28 | Composition par composants |
+| `nodes.test.js` | 18 | Sous-composants et overrides |
+| `themes.test.js` | 6 | Registre et paquets de thèmes |
+| `zenraymedia.test.js` | 69 | Contrats, formats, Cut, Critique, Forge et publication |
+
+Les 103 déclarations de `MediaApp.test.jsx` couvrent l'interface de base puis des groupes Slate,
+Photoshop, Figma, PowerPoint, Miro et Illustrator. Les 196 déclarations de `layers.test.js`
+approfondissent la géométrie, les tracés, les groupes, contraintes, Auto Layout, diapositives,
+tableaux, animations et connecteurs. Cette densité constitue une bonne preuve de logique pure ; elle ne remplace toutefois
+aucune des portes suivantes : rendu dans Chrome et Safari, pixels de référence, vraie
+rasterisation, fichier PDF ouvert, paquet multi-page, navigation clavier complète, mesure
+d'accessibilité, budget de performance, migration d'ancien document et publication reçue par une
+plateforme.
+
+## Fonctions absentes de la vision puissante
+
+Ces absences ne correspondent à aucun export actuel, aussi une matrice limitée aux fonctions
+existantes ne peut-elle pas les révéler.
+
+| Objet ou service absent | Responsabilité minimale | Dépendance |
+|---|---|---|
+| `ProjectContext` persistant | Lier projet, thème, format, page, sélection, Create et dirty state | Migration du document |
+| `Page` canonique | Posséder Lego, calques, groupes, relations et ordre | Schéma de scène unique |
+| `Variant` | Dériver un format sans toucher à la source, stocker les overrides | Page canonique |
+| `CommandTransaction` | Un geste, une validation, un undo, un autosave | Réduction de `MediaApp.jsx` |
+| `ThemePackage` versionné | Valider identité, pièces, props, actifs, polices, droits et compatibilité | Contrat vivant de thème |
+| `RenderJob` | Exécuter une sortie, suivre progression, erreur, reprise et journal | Rendu unique |
+| `Artifact` | Porter fichier, checksum, dimensions, poids, transparence, provenance et QA | RenderJob |
+| `Delivery` | Former ZIP/manifeste ou remise plateforme atomique | Artifact vérifié |
+| `Publication` | Conserver statut, canal, version, reçu, URL, date et erreur | Delivery |
+| Galerie | Rechercher, filtrer, dupliquer, republier et ouvrir une publication | Publication persistante |
+| Adaptateurs Instagram/LinkedIn | Contraintes, authentification, idempotence, retries et reçu | Publication et coffre de secrets |
+| Recovery journal | Restaurer après quota, crash, conflit ou migration | CommandTransaction et stockage fiable |
+| Validation d'accessibilité | Clavier, focus, contrastes, reduced motion et texte alternatif | Scène et artefact |
+| QA visuelle | Comparaison PNG, polices, débordement, zones sûres et rendu multi-navigateur | Artifact déterministe |
+| Observabilité | Relier erreur et durée à un projet, une version et un job | Identifiants stables |
+
+Les lots G0 à G9 de `03-CODE-ARCHITECTURE-DONNEES.md` décrivent où générer ces frontières sans
+ajouter d'abstraction avant leur usage. `06-BACKLOG-PRIORISE.md` fixe leur ordre ; la première
+tranche ne demande que Projet, Page, Variante, Transaction, Job, Artefact, Livraison, Publication
+et Galerie pour un carrousel Instagram ou LinkedIn.
+
+## Verdict de la seconde lecture
+
+Le code possède beaucoup plus de micro-fonctions d'édition que la promesse de publication n'en
+exige au départ, tandis que les neuf objets aval qui transforment une scène en résultat fiable
+restent absents. La puissance ne vient donc plus d'une famille supplémentaire : elle vient du
+raccordement des primitives existantes à une source immuable, puis à un artefact contrôlé et à une
+publication retrouvable.

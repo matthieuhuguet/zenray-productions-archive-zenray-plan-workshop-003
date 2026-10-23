@@ -1,0 +1,339 @@
+# Audit de la famille Illustrator 30.6
+
+## Source et règle de preuve
+
+La liste dictée comprend bien huit familles, dans cet ordre : sélection, dessin vectoriel,
+transformation, apparence, texte, organisation, images, plans de travail et export. Au début de
+cette passe, cette liste complète ne vit encore ni dans `VISION.md` ni dans `KANBAN.md` : elle ne
+survit que dans la trace de la session qui lance son intégration. Le commit `f6255b0` publie I1,
+`5ceae3a` publie I2, puis `2156228` indexe I3 à I8 et ajoute le seul code neuf de cette seconde
+série, `embedImages` pour I7. La suite dédiée atteint alors 498 cas dans onze fichiers ; l'audit
+préserve la liste sans transformer sa propre interprétation en nouvelle vision.
+
+Les statuts employés ci-dessous sont cumulatifs :
+
+- **C** : une primitive existe dans le code ;
+- **T** : un test automatisé l'exerce ;
+- **U** : une commande visible permet de l'atteindre ;
+- **P** : couverture partielle ou traduction réduite ;
+- **D** : exclusion décidée et écrite ;
+- **A** : absence observée ;
+
+Une carte marquée « déjà couverte » ne vaut donc pas couverture de toutes ses sous-fonctions.
+
+## Vue d'ensemble
+
+| Famille dictée | État réel | Lecture |
+|---|---|---|
+| I1 Sélection et édition directe | **C T U P** | Le calque entier, la multi-sélection et le rectangle existent ; la sélection structurelle reste limitée |
+| I2 Formes et tracés vectoriels | **C T U P** | Un vrai chemin Bézier arrive avec la Plume, mais le moteur vectoriel complet manque |
+| I3 Transformation et arrangement | **C T U P** | Le socle spatial couvre l'usage social courant, non le contrat Illustrator entier |
+| I4 Fond, contour et apparence | **C T U P** | Solide, dégradé linéaire, opacité et effets simples existent, sans pile d'apparence |
+| I5 Texte | **C T U P** | Un bloc HTML vivant est éditable, mais les régimes typographiques Illustrator manquent |
+| I6 Groupes, calques et masques | **C T U P** | La pile et des groupes plats existent ; ni hiérarchie documentaire ni masque réel |
+| I7 Images | **C T U P** | Placement, point focal et incorporation partielle à l'export existent ; aucun cycle de lien ou de vectorisation |
+| I8 Plans de travail et export | **C T U P** | Les formats et diapositives approchent l'intention, mais ne forment pas des plans de travail livrables |
+
+Le verdict global est donc « huit cartes traitées », non « Illustrator prêt à 8/8 ». I2 apporte la
+première géométrie vectorielle véritable et I7 une tentative d'incorporation à l'export ; les
+familles I4, I6, I7 et I8 restent incapables de conserver puis livrer la scène avec le niveau de
+contrôle promis.
+
+## I1 Sélection et édition directe des objets
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Outil Sélection | **C T U** | Clic d'objet, boîte, déplacement et panneau Détails |
+| Outil Sélection directe | **C T U P** | I2 expose une ancre et ses deux poignées ; aucun segment ni ensemble de points sélectionné |
+| Sélection de groupe | **D P** | Le KANBAN substitue un modèle de groupes plats ; aucun parcours progressif enfant, parent, ancêtre |
+| Sélection multiple | **C T U** | Modificateur, commandes globales et valeurs mixtes |
+| Rectangle de sélection | **C T U P** | `layersInRect` existe ; il ne partage pas partout la visibilité effective ni l'appartenance de page |
+| Lasso | **A** | Aucun geste libre de sélection |
+| Baguette magique | **D** | Écartée dans I1 ; aucune sélection par fond, contour, opacité ou fusion |
+| Menu Sélection | **P** | Tout sélectionner et Inverser existent ; aucun critère de propriété ou type |
+| Sélection depuis Calques | **C T U** | La hiérarchie cible les calques et les pièces |
+| Mode Isolation | **D** | Écarté avec le groupe plat ; aucun contexte isolé ni fil d'Ariane |
+| Préférences de sélection et d'ancres | **A** | Aucun réglage de surface, trait, taille ou visibilité des points |
+
+Trois divergences traversent cette famille. Un groupe masqué ou verrouillé n'est pas interprété de
+la même façon par le rendu, le rectangle, le magnétisme et les surcouches. Un tracé retourné ou
+pivoté affiche une surcouche dont le calcul du pointeur reste dans l'axe de sa boîte. Enfin, la
+sélection directe ne possède ni clavier ni nom accessible sur ses poignées.
+
+## I2 Création et modification de formes et de tracés vectoriels
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Formes géométriques dynamiques | **C T U P** | Rectangle, ellipse, ligne, polygone et étoile ; widgets directs et paramètres complets absents |
+| Plume | **C T U P** | Clic angle, glisser courbe, chemin ouvert ou fermé, aperçu pendant le geste |
+| Crayon | **A** | Aucun tracé libre, fidélité ou lissage |
+| Courbure | **C T U P** | Double-clic angle ou lisse sur une ancre ; aucun outil ou flux Courbure autonome |
+| Points et poignées | **C T U P** | Déplacement d'une ancre ou d'une poignée, insertion et suppression ; pas de multi-sélection ni snapping vectoriel |
+| Widgets de coins et de formes | **P** | Rayon et paramètres passent par Détails, non par widgets sur le canevas |
+| Point d'ancrage et Arrondi | **C T U P** | Conversion angle ou lisse ; aucun outil Arrondi ni rayon par coin |
+| Shape Builder | **A** | Aucune détection ou fusion de régions |
+| Pathfinder | **A** | Aucune réunion, soustraction, intersection, exclusion ou division |
+| Formes et chemins composés | **A** | Aucun graphe conservant plusieurs chemins et leur règle de remplissage |
+| Découpe et fusion | **A** | Aucune opération géométrique destructive ou réversible |
+
+### Intégration I2 observée
+
+Le commit `5ceae3a` ajoute neuf exports nommés à `layers.js`, les champs `pathPoints`,
+`pathClosed`, `pathStrokeColor` et `pathStrokeWidth`, un rendu `<svg><path>`, la Plume dans la
+bibliothèque, une surcouche d'ancres, des contrôles de contour et vingt-quatre déclarations de test
+pur supplémentaires. C'est une verticale réelle, de la donnée au HTML ; sa suite automatisée est
+verte, sans pour autant fermer les portes navigateur, page et artefact qui suivent.
+
+Les défauts suivants sont observables dans cette intégration :
+
+1. `createPathLayer` appelle `addLayer` sans rattacher le tracé à la diapositive active ; le tracé
+   devient alors un masque global visible sur toutes les diapositives.
+2. Chaque mouvement d'ancre ou de poignée appelle `patchComposition` ; il crée donc un état
+   d'historique et une sauvegarde par événement de pointeur.
+3. Les coordonnées du pointeur ne passent pas par l'inverse de la rotation ou du retournement du
+   calque ; la manipulation diverge de la courbe visible dès qu'un transform est actif.
+4. La normalisation borne ancres et poignées entre 0 et 100 ; une édition ne peut pas agrandir la
+   boîte ni laisser une tangente dépasser de son enveloppe d'origine.
+5. L'insertion ajoute un point d'angle sans subdiviser la courbe par De Casteljau ; un segment
+   courbe peut donc changer de forme au lieu de rester visuellement identique.
+6. La fermeture est permise dès deux points, tandis que `pathD` refuse de fermer un chemin de deux
+   points ; l'état peut annoncer « Fermé » et rendre un chemin ouvert.
+7. Le style enlève le fond rectangulaire, mais conserve la bordure et l'ombre CSS génériques ; un
+   tracé peut recevoir un cadre ou une ombre de boîte qui ne suit pas sa silhouette.
+8. Les doubles-clics et la suppression clavier ne vérifient pas tous `isEffectivelyLocked` ; un
+   calque membre d'un groupe verrouillé peut encore changer par certains chemins.
+9. Le brouillon de Plume n'est annulé ni par le bouton qui désactive l'outil, ni clairement lors
+   d'un changement de projet, thème, format ou diapositive ; il peut rester comme tracé fantôme
+   tandis que le canevas reprend la sélection rectangulaire.
+10. L'aperçu montre le point pendant son glisser, mais aucun fil élastique ne suit le pointeur entre
+    deux clics, contrairement au comportement décrit dans la vision dictée.
+11. Aucun test de ressource, de pixel, de transparence, de rotation, de retournement, de page ou
+    d'export SVG ne ferme encore le contrat du tracé.
+12. Les huit tests d'interface I2 passent dans jsdom tout en affichant l'avertissement
+    « `NaN` is an invalid value for the `left` css style property » : ils prouvent que la branche
+    UI se déclenche, non que les coordonnées du pointeur produisent une courbe correcte.
+13. Le tracé reste un calque `shape`, aussi le panneau affiche encore « Type de forme » avec
+    Rectangle, Ellipse, Ligne, Polygone et Étoile ; changer cette valeur ne modifie pas le tracé et
+    expose donc une commande sans effet.
+14. Le sélecteur Solide ou Dégradé reste lui aussi visible, alors que la compilation désactive
+    `fillOf` pour un tracé ; choisir Dégradé conserve silencieusement son ancien fond uni.
+15. `patchComposition` incrémente déjà le compteur d'actions, puis `terminerTrace` l'incrémente une
+    seconde fois ; poser un seul tracé est donc compté comme deux actions.
+16. Terminer un tracé sélectionne le calque et bascule vers Détails sans désactiver la Plume ; le
+    seul témoin « active » disparaît au moment exact où le prochain clic vide reste capturé par
+    l'outil.
+17. La note d'état du canevas lit `pieceSelectionnee` seulement ; sélectionner un tracé, comme tout
+    autre calque, laisse donc le texte « Sélection : aucune » affiché sous les yeux de l'utilisateur.
+
+Le risque de retard React au relâché, envisagé pendant la photographie intermédiaire, n'est plus
+retenu : le commit final porte désormais `dx` et `dy` dans `plumeGesteRef`, indépendamment du rendu
+de l'aperçu. Il reste toutefois à exercer ce geste dans un navigateur qui fournit de vraies
+coordonnées de pointeur.
+
+La correction ne demande pas d'ajouter immédiatement Pathfinder. Elle demande d'abord une
+transaction de geste, une appartenance de page, une matrice inverse de pointeur et un artefact SVG
+ou raster réellement ouvert et mesuré.
+
+## I3 Transformation, positionnement, alignement et arrangement
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Déplacement | **C T U P** | Geste direct et X/Y ; un état d'historique par mouvement |
+| Redimensionnement | **C T U P** | Huit poignées et L/H ; pas de transformation collective de groupe |
+| Rotation | **C T U P** | Poignée et valeur ; édition interne d'un tracé pivoté incorrecte |
+| Réflexion | **C T U** | Retournement horizontal et vertical |
+| Cisaillement | **A** | Aucun champ ni matrice de cisaillement |
+| Répétition d'une transformation | **A** | Aucun Transformer de nouveau ou répétiteur |
+| Coordonnées et dimensions | **C T U** | X, Y, largeur, hauteur et rotation dans Détails |
+| Verrouillage des proportions | **P** | Maj pendant un redimensionnement de coin ; aucun verrou persistant |
+| Contours, effets et motifs à l'échelle | **A** | Aucun choix de politique ; les modèles CSS réagissent différemment |
+| Alignement | **C T U P** | Bords et centres, sélection ou canevas ; aucun point d'ancrage ou objet clé |
+| Répartition | **C T U P** | Répartition géométrique simple ; aucun espacement prévisualisé ou saisi |
+| Objet clé | **A** | Aucune cible immobile explicite |
+| Ordre d'empilement | **C T U P** | Pile, premier et arrière-plan ; structure de groupe et de page fragile |
+| Duplication | **C T U P** | Bouton et copier-coller ; pas de duplication Alt pendant le glisser |
+| Copier, couper et coller | **C T U P** | Presse-papiers interne ; références et appartenance de page non remappées |
+| Annuler et rétablir | **C T U P** | Deux piles de cinquante ; ni transaction continue ni persistance |
+| Historique | **P** | Piles internes sans panneau, libellé, session restaurée ou branche visible |
+
+I3 couvre le 80/20 d'une affiche fixe, mais sa dette est transversale : une transformation ne doit
+former qu'une commande, et la même matrice doit gouverner rendu, surcouche, pointeur et export.
+
+## I4 Fond, contour, couleur, dégradé et apparence
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Fond et contour | **C T U P** | Fond CSS, bordure libre et contour dédié du tracé |
+| Absence de fond ou contour | **P** | Valeur vide dans le modèle, sans commande « aucun » cohérente |
+| Inversion fond et contour | **A** | Aucun geste d'échange |
+| Couleur et nuanciers | **P** | Sélecteurs natifs et tokens de thème, aucun nuancier documenté |
+| Épaisseur et alignement du contour | **P** | Épaisseur du tracé ; aucun alignement intérieur, centre ou extérieur |
+| Extrémités et jointures | **A** | Aucun `linecap` ou `linejoin` réglable |
+| Pointillés et flèches | **A** | Ni motif de tiret ni marqueur de bout |
+| Profils de largeur | **A** | Contour uniforme seulement |
+| Dégradés | **P** | Linéaire à deux couleurs pour les boîtes ; radial, libre, stops et tracés absents |
+| Opacité et fusion | **C T U** | Opacité et douze modes CSS |
+| Effets | **C T U P** | Flou, luminosité, contraste, saturation, ombre ; pile et portée absentes |
+| Plusieurs fonds et contours | **D A** | Un seul fond choisi, aucune pile |
+| Styles graphiques | **A** | Aucun style lié, duplication ou mise à jour globale |
+| Pipette | **A** | Aucun prélèvement sur le canevas |
+| Panneau Apparence | **A** | Le panneau Détails expose des champs plats, non une liste ordonnée d'attributs |
+| Masque d'opacité | **A** | Aucun modèle de masque progressif |
+
+Avant d'étendre les styles, le Critique doit lire les couleurs et effets réellement compilés. Sans
+cette boucle, ajouter un dégradé ou un contour multiplie les sorties non contrôlées.
+
+## I5 Création, édition et mise en forme du texte
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Texte ponctuel | **A** | Tout calque texte possède une boîte ; aucun régime ponctuel distinct |
+| Texte captif | **C T U P** | Le texte HTML se renvoie dans une boîte ; débordement et chaînage non signalés |
+| Texte sur un tracé | **A** | Aucun `textPath`, repère ou orientation liée au chemin I2 |
+| Texte horizontal | **C T U** | Régime par défaut |
+| Texte vertical | **A** | Aucun mode d'écriture vertical |
+| Sélection et édition de caractères | **P** | Textarea pour le contenu entier ; aucun style sur une plage |
+| Police, style et taille | **C T U P** | Trois familles, six graisses, italique et corps ; disponibilité non vérifiée |
+| Approche, crénage et interlignage | **P** | Interlettre et interligne ; aucun crénage par paire |
+| Échelle et ligne de base | **A** | Aucun contrôle horizontal, vertical ou décalage de base |
+| Alignement et justification | **P** | Gauche, centre, droite et alignement vertical ; aucune justification |
+| Paragraphes, retraits et espacements | **A** | Aucun retrait, espace avant ou après, césure ou style de paragraphe |
+| Listes | **C T U P** | Puces ou nombres sur un niveau, sans indentation ni niveaux |
+| Colonnes et chaînage | **A** | Aucun flux entre blocs |
+| Touch Type | **A** | Aucun transform par caractère vivant |
+| Japonais et options linguistiques | **A** | Aucun langage de document ; le HTML compilé porte encore `lang="fr"` en dur |
+
+Le manque japonais n'est pas décoratif : césure, retour de ligne, texte vertical, polices et langue
+font partie de la fidélité du média. Une première correction utile consiste à porter la langue et
+la direction dans le document et l'artefact, avant Touch Type ou les effets curvilignes.
+
+## I6 Organisation par groupes, calques, empilement et masques
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Groupement et dégroupement | **C T U P** | Groupe plat par `groupId`, sans boîte ni transformation collective |
+| Groupes imbriqués | **A** | Aucune parenté de groupe |
+| Mode Isolation | **D A** | Écarté dans I1 |
+| Calques et sous-calques | **P** | Une pile de calques et des dossiers plats ; aucun calque documentaire imbriqué |
+| Déplacement entre structures | **A** | `moveLayerTo` est exporté et testé, mais sans appel de production |
+| Ordre d'empilement | **C T U P** | Rang `z` global ; portée de groupe et de page ambiguë |
+| Visibilité | **C T U P** | État propre et de groupe ; consommateurs divergents |
+| Verrouillage | **C T U P** | État propre et effectif ; plusieurs gestes contournent encore le groupe verrouillé |
+| Ciblage d'apparence | **A** | Aucune apparence collective de groupe ou de calque |
+| Repérage des objets | **C T U** | Hiérarchie et sélection par nom |
+| Recherche et filtrage | **C T U P** | Recherche textuelle, sans filtre de type ou propriété |
+| Masque d'écrêtage | **A** | Aucun chemin supérieur qui découpe ses enfants |
+| Masque d'opacité | **A** | Aucun masque progressif |
+| Suppression et duplication | **C T U P** | Présentes ; les groupes de diapositives restent destructibles par les gestes ordinaires |
+
+Le mot « masque » désigne actuellement un calque global commun aux diapositives, non un masque
+d'écrêtage Illustrator. Les deux notions doivent rester séparées dans le modèle et dans l'interface.
+
+## I7 Placement, liaison, incorporation et vectorisation des images
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Importer ou Place | **P** | Recherche d'images Create et dépôt ; pas de commande fichier générale dans l'éditeur |
+| Placement de plusieurs fichiers | **A** | Aucun lot de fichiers à poser successivement |
+| Images liées | **A** | Une chaîne `source` ou URL ne porte aucun contrat de lien |
+| Images incorporées | **C T U P** | I7 tente une URI `data` à l'export, sans état incorporé explicite dans le document ni garantie en cas d'échec |
+| Panneau Liens | **A** | Aucun statut, vignette, chemin, taille, date ou provenance |
+| Mise à jour et remplacement | **A** | Aucun suivi de modification ni remplacement de toutes les instances |
+| Réédition et ouverture de l'original | **A** | Aucun geste vers l'actif source |
+| Incorporation et désincorporation | **A** | Aucun changement de régime ni extraction |
+| Recadrage et masquage | **P** | Boîte `cover` et point focal ; aucune fenêtre de crop ou masque vectoriel |
+| Vectorisation de l'image | **A** | Aucun calcul bitmap vers chemins |
+| Préréglages de vectorisation | **A** | Aucun modèle, aperçu ou paramètre |
+| Développement ou libération | **A** | Aucun objet de vectorisation vivant à développer |
+
+La première priorité n'est pas la vectorisation automatique. L'application doit d'abord savoir
+quelle image elle utilise, si elle peut la republier, si elle manque, si elle a changé et quelle
+résolution atteint l'artefact final.
+
+### Intégration I7 publiée
+
+Le commit `2156228` ajoute `embedImages` à `exporters.js` et l'appelle depuis les exports HTML, PNG
+et PDF. Il transforme les `src` distants trouvés dans certaines balises `img` en URI `data`, avec
+cinq tests unitaires. Cette incorporation réduit une dépendance réseau du fichier final, mais elle
+ne constitue ni un modèle d'actif lié/incorporé ni une garantie d'artefact autonome.
+
+Les limites observables sont précises :
+
+1. une erreur réseau ou CORS laisse silencieusement l'URL distante dans le fichier ; l'export HTML
+   n'est alors pas autonome et le PNG peut rester contaminé par le canevas ;
+2. le cache global conserve aussi les échecs, sans nouvelle tentative, et ne possède ni limite de
+   taille, ni invalidation, ni version de ressource ;
+3. le parseur ne reconnaît que les `img` dont `src` est entre doubles guillemets ; il ignore les
+   guillemets simples, `srcset`, les sources de `picture`, les éléments SVG `image` et les
+   `background-image` des composants ;
+4. l'expression prend à tort `data-src` pour `src`, puis le remplacement de chaîne peut atteindre
+   un autre attribut ou du texte qui contient le même fragment ; une URL HTML échappée n'est pas
+   décodée avant le `fetch` ;
+5. le type MIME fourni par le serveur n'est pas limité à une image et aucun plafond de poids ne
+   protège la mémoire ; la conversion base64 puis le cache peuvent conserver plusieurs copies d'un
+   gros actif ;
+6. les images sont traitées en série, sans délai maximal, annulation ou progression ; une requête
+   qui ne se résout pas suspend donc indéfiniment HTML, PNG et PDF ;
+7. le PDF attend les polices mais n'exige ni `decode()` ni une vérification explicite de toutes les
+   images avant d'ouvrir l'impression ;
+8. les tests n'exercent ni l'appel depuis les trois exporteurs, ni une réponse CORS, ni une reprise,
+   ni une image CSS, ni la réouverture réelle du HTML, du PNG ou du PDF produit.
+
+Le contrat utile exige un collecteur DOM/CSS, une liste d'actifs avec état et droits, une politique
+d'échec bloquante pour les livrables autonomes, un cache borné par version, puis une preuve de
+décodage avant rendu. Le passage lié vers incorporé doit rester visible et réversible dans le
+document, non arriver seulement comme effet caché de l'export.
+
+## I8 Plans de travail, canevas et exportation
+
+| Sous-fonction dictée | État | Preuve ou manque |
+|---|---|---|
+| Création du document | **C T U P** | Projet, brief et fichier `.zmedia.json`, sans réglages de document vectoriel |
+| Canevas et navigation | **C T U P** | Canevas borné, pan, zoom et cadrage ; pas d'espace étendu multi-plans |
+| Outil Plan de travail | **A** | Aucun outil direct ni sélection spatiale de surface de sortie |
+| Ajout et suppression | **C T U P** | Diapositives ajoutées et supprimées comme groupes |
+| Duplication | **C T U P** | Copie de diapositive, avec limites de modèle et d'ordre |
+| Renommage | **A** | Noms automatiques, aucune commande dédiée |
+| Redimensionnement et orientation | **A** | Le format reste global au projet courant, non propre à une diapositive |
+| Réorganisation | **C T U P** | Monter ou descendre dans une liste, sans grille ni espacement |
+| Verrouillage | **P** | Groupe verrouillable ailleurs, sans état de plan de travail distinct |
+| Déplacement de l'illustration avec le plan | **A** | Surface et contenu ne forment pas un objet transactionnel |
+| Ajustement à l'illustration | **A** | Aucun calcul de plan depuis les limites de contenu |
+| Panneau Plans de travail | **P** | Liste Diapositives sans miniature, dimension, orientation ou sélection multiple |
+| Export de plusieurs plans | **P** | Boucle PNG de toutes les diapositives, non atomique et non validée comme fichiers |
+| Exportation pour les écrans | **A** | Aucun choix simultané de plans, formats, échelles et destination |
+| Exportation d'actifs | **A** | Aucun objet collecté ni suffixe d'échelle |
+| Export local ou cloud | **P** | Téléchargements navigateur, Create pour la source, aucun `Delivery` ni reçu |
+
+I8 confirme l'écart central de la vision : une liste de diapositives n'est pas encore un système de
+pages. Tant que Lego, calques, groupes, relations, format et QA n'appartiennent pas à une même
+`Page`, le lot PNG peut compiler plusieurs vues sans garantir qu'il livre le bon carrousel.
+
+## Contre-lecture des cartes publiées I3 à I8
+
+Le commit final ferme administrativement la liste, mais il ne change pas le sens des preuves. I3
+omet encore cisaillement, répétition, objet clé, politique de mise à l'échelle et transaction. I4
+réemploie des styles de boîte ; sur un tracé, le sélecteur Dégradé reste visible alors que le
+compilateur l'ignore. I5 ne couvre ni langue, débordement, plages riches, verticalité, colonnes ni
+texte sur chemin. I6 appelle « masque » le contenu global des diapositives, qui n'est ni un masque
+d'écrêtage ni un masque d'opacité. I7 appelle « liée » une URL sans identité, statut, mise à jour ou
+provenance et « incorporée » une tentative silencieuse de l'export. I8 assimile une diapositive à
+un plan de travail alors que Lego reste global, que le format reste commun et que la Plume comme
+les connecteurs contournent encore l'appartenance à la page active.
+
+La mention `8/8` de `VISION.md` est donc exacte seulement comme compteur de cartes ayant reçu une
+décision. Elle est fausse si elle signifie huit capacités intégrées, validées et prêtes à livrer.
+
+## Ordre de correction Illustrator
+
+1. Fermer I2 comme donnée de page et commande transactionnelle, puis vérifier rotation,
+   retournement, verrouillage et artefact.
+2. Étendre le contrat `Page` et `Variant` avant I8, puisque les plans de travail et la livraison en
+   dépendent.
+3. Raccorder langue, polices et débordement avant d'étendre I5.
+4. Créer provenance et état des images avant la vectorisation I7.
+5. N'ouvrir Pathfinder, apparences multiples, texte sur tracé et masques qu'après un cas de média
+   qui les exige et un format de sortie capable de les conserver.
+
+Ce séquençage garde l'apport utile de la Plume sans laisser une imitation partielle d'Illustrator
+détourner le produit de sa boucle première : composer, contrôler, livrer, publier et retrouver.

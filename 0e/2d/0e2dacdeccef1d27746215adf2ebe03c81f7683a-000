@@ -1,0 +1,160 @@
+# Matrice des six logiciels et des huit familles
+
+## Périmètre et preuve
+
+La vision nomme six logiciels ou éditeurs, non cinq : Slate/UMG, Photoshop, Figma, PowerPoint,
+Miro et Illustrator. Si Slate sert seulement de cadre d'interface et doit sortir du décompte, il
+reste cinq logiciels de création ; cependant `VISION.md` le compte explicitement dans les six.
+
+Les symboles suivants empêchent de confondre une fonction écrite avec un produit prêt :
+
+- **C** : code observé ;
+- **T** : test automatisé observé ;
+- **I** : parcours intégré prouvé ;
+- **V** : validation humaine consignée ;
+- **R** : prêt à produire, avec reprise et sortie finale mesurée.
+
+Au point de départ stable de l'audit, Slate, Photoshop et Figma portent chacun huit décisions de
+carte, tandis que PowerPoint en porte trois. PowerPoint puis Miro reçoivent leurs huit décisions
+pendant l'audit, dont certaines réemploient le socle et d'autres écartent une fonction. La liste
+Illustrator dictée est ensuite retrouvée dans la trace de session : I1 paraît dans `KANBAN.md` au
+commit `f6255b0`, puis I2 est publiée au commit `5ceae3a`. Tout ratio sur 48 décrit
+donc des cartes fermées, proposées ou explicitement écartées, jamais autant de capacités prêtes.
+Le commit `2156228` publie finalement I3 à I8 : I7 ajoute `embedImages`, tandis que I3 à I6 et I8
+ne changent aucun code et consignent des réemplois ou exclusions. Un brouillon InDesign D1 à D8
+apparaît ensuite dans la vision vivante ; Matthieu l'exclut explicitement de cette clôture, qui
+reste donc exactement une matrice 6 × 8.
+
+## Slate et UMG
+
+| # | Famille | Preuve observée | Ce qui manque pour la vision | Décision recommandée |
+|---|---|---|---|---|
+| S1 | Sélection, inspection, propriétés | **C T** : sélection multiple, valeurs mixtes, verrou du panneau Détails | Édition atomique de toute la sélection, état effectif des groupes, test navigateur, clavier complet | Garder ; corriger les états effectifs avant tout nouveau réglage |
+| S2 | Viewport, manipulation directe | **C T** : zoom, déplacement de vue, rotation, magnétisme, cadrage | Les objets invisibles servent encore au magnétisme ; un glisser pollue l'historique ; les transformations ne forment pas une transaction | Stabiliser le geste et sa preuve E2E |
+| S3 | Docking, panneaux, onglets | **C T** : deux séparateurs redimensionnent les colonnes | Pas de vrai docking, d'onglets déplaçables ni de disposition persistante | Ne pas copier Unreal ; mémoriser seulement largeur et replis utiles |
+| S4 | Menus, commandes, raccourcis | **C T** : menu contextuel, palette de commandes, raccourcis | Registre dispersé dans `MediaApp.jsx`, conflits de focus possibles, menus peu accessibles au clavier et au tactile | Créer plus tard un registre unique de commandes avec disponibilité et raccourci |
+| S5 | Actifs, recherche, filtres | **C T** : la palette cherche commandes, composants, thèmes et actifs ; la bibliothèque possède onglets et recherche | Pas de provenance, licence, favoris, récents, usages, métadonnées ni état de chargement robuste | Fermer la dérive du KANBAN, puis créer un vrai Asset Graph seulement pour les sorties sociales |
+| S6 | Collections, listes, tableaux | **C T** : filtre de hiérarchie, groupes, tri par rang | Pas de collections enregistrées, vues nommées, sélection filtrée sûre ni opérations de lot | La recherche suffit aujourd'hui ; ne pas construire un tableur de calques |
+| S7 | Graphes nodaux | **Décision d'exclusion** | Le futur rendu, la publication et l'animation ont des graphes d'état, mais aucun besoin ne justifie un éditeur nodal visuel | Garder hors interface ; modéliser les dépendances en données ordinaires |
+| S8 | Focus, glisser-déposer, retour d'action | **C T** : navigation de hiérarchie, dépôts, notifications | Cibles tactiles petites, focus visible incomplet, glisser sans alternative clavier, statut de sauvegarde trompeur | Corriger accessibilité et statut ; aucun besoin d'ajouter des gestes |
+
+Lecture : Slate donne déjà la bonne géographie d'interface, mais le produit ne gagne rien à imiter
+son système de docking ou son éditeur de graphes. Le 80/20 restant concerne la solidité des gestes,
+la recherche et le focus.
+
+## Photoshop
+
+| # | Famille | Preuve observée | Ce qui manque pour la vision | Décision recommandée |
+|---|---|---|---|---|
+| PS1 | Sélection et ciblage | **C T** : rectangle, tout sélectionner, inverser | Le rectangle inclut les calques masqués ou d'une autre diapositive ; sélection et surcouche ne partagent pas la visibilité effective | Corriger avant les pages, puis tester rotation et groupes dans le navigateur |
+| PS2 | Déplacement, alignement, transformation | **C T** : déplacement, redimensionnement, rotation, alignement, distribution, retournement | Pas de groupe géométrique, point de pivot, saisie matricielle ni transaction continue ; certains cadres restent visibles hors page | Unifier les transformations autour d'une transaction et d'une boîte commune |
+| PS3 | Texte et typographie | **C T** : police, corps, graisse, italique, couleur, alignement, interlettrage, interligne | Éditeur en place non fidèle au rendu, pas de styles de paragraphes, spans riches, césure, langue ni contrôle de police manquante | Servir d'abord titres et légendes sociales ; ajouter une vraie édition riche seulement avec un besoin mesuré |
+| PS4 | Formes vectorielles | **C T** : rectangle, ellipse, ligne, polygone, étoile | Ce sont des boîtes CSS ou `clip-path`, sans chemin, nœud, booléen ni SVG éditable | Ne pas les appeler moteur vectoriel ; réserver ce terme au futur contrat Illustrator |
+| PS5 | Calques, groupes, empilement | **C T** : pile, groupes repliables, masquage, verrou, contiguïté | Un groupe n'a ni boîte ni transformation ; pas de déplacement collectif sur le canevas ; aucune imbrication ; les diapositives réemploient ce modèle avec des limites | Donner une identité de page avant d'enrichir les groupes |
+| PS6 | Import, placement, recadrage | **C T** : image et point focal dans une boîte en `cover` | Pas de fenêtre de recadrage, masque, orientation EXIF, résolution utile, licence, alt ni liaison à un actif stable | Construire provenance et validation d'image avant un outil de recadrage avancé |
+| PS7 | Apparence, fusion, styles | **C T** : opacité, 12 mélanges, quatre filtres, ombre, dégradé simple | Critique déconnecté des couleurs rendues, pas de pile d'apparences, masque ni calque de réglage | Mesurer le rendu réel ; n'ajouter plusieurs apparences qu'après un cas réel |
+| PS8 | Édition fondamentale et historique | **C T** : annuler, rétablir, copier, couper, coller, limite 50 | Un mouvement crée un état par événement de pointeur et enregistre tout le projet ; le collage retire l'appartenance de page et ne remappe pas les références ; historique non persistant | P0 : une transaction par geste, collage versionné en deux passes et test de reprise |
+
+Lecture : Photoshop est largement présent au niveau des primitives, mais « 8/8 » reste un statut de
+carte. Les défauts de sélection effective et d'historique touchent chaque geste, donc leur portée
+dépasse n'importe quel nouvel effet.
+
+## Figma
+
+| # | Famille | Preuve observée | Ce qui manque pour la vision | Décision recommandée |
+|---|---|---|---|---|
+| F1 | Sélection et manipulation | **C T**, réemploi de Slate et Photoshop | Même dette de visibilité, transactions et E2E | Ne pas dupliquer les commandes ; réparer le socle commun |
+| F2 | Calques, hiérarchie, empilement | **C T**, réemploi de la pile et des groupes | Le modèle Lego et le modèle Layer coexistent ; ordre et page ne couvrent pas les deux | Faire converger vers un seul arbre de scène |
+| F3 | Frames, groupes, sections, contraintes | **C T** : quatre contraintes par axe | Le changement de format réécrit la géométrie source, ce qui crée de la dérive au retour ; aucune frame géométrique | Remplacer par variantes non destructives et géométrie résolue à la lecture |
+| F4 | Auto Layout | **C T** : flux ligne ou colonne et espacement | Pas de Hug, Fill, Fixed, alignement croisé, padding, retour à la ligne, taille de conteneur ni min/max | Implémenter seulement après le modèle unifié ; une boîte de groupe devient alors nécessaire |
+| F5 | Création et édition de texte | **C T** : double-clic et textarea superposée | La textarea n'hérite pas exactement police, rotation, métriques, zoom et disposition ; l'édition n'est pas WYSIWYG | Remplacer l'illusion d'édition en place par un éditeur réellement calé ou rester dans Détails |
+| F6 | Formes vectorielles | **C T** : polygone et étoile paramétriques | Aucun chemin Bézier, nœud, poignée, opération booléenne ou import SVG éditable | Suffisant pour les posts ; laisser le vrai vecteur à Illustrator |
+| F7 | Apparence | **C T** : solide ou dégradé linéaire | Un seul fill, pas de gradient radial, stops, strokes multiples, styles liés ni variables | Ne pas étendre avant que le Critique lise les couleurs réelles |
+| F8 | Composants, instances, variantes | **C T** : composant HTML partagé, réglages locaux, échange de source, sous-composants | Identité des nœuds par index DOM fragile, 24 textes maximum, champ vide impossible, aucune migration d'override, variantes nommées absentes | P1 : identifiants sémantiques versionnés et alerte d'override orphelin |
+
+Lecture : les contraintes et composants sont stratégiques, mais leur implémentation actuelle repose
+sur une source que le format peut muter et sur des chemins DOM positionnels. Ces deux choix doivent
+être corrigés avant d'industrialiser 1 024 thèmes.
+
+## PowerPoint
+
+| # | Famille | Preuve observée | Ce qui manque pour la vision | Décision recommandée |
+|---|---|---|---|---|
+| PP1 | Structure, diapositives, masques | **C T** : une diapositive réemploie un groupe, avec ajout, copie, suppression, ordre et activation ; les calques libres jouent le masque | Les pièces Lego ne suivent pas les diapositives ; pas de vignette, disposition, section, note, format par page ni export de lot ; une copie part en fin de liste | P0 produit : créer de vraies pages canoniques, puis migrer les groupes-diapositive |
+| PP2 | Sélection, transformation, organisation | **C T** : alignement sur canevas, premier et arrière-plan, ratio avec Maj | Les limites héritées des groupes, de la sélection cachée et de l'historique subsistent | Aucun ajout avant le socle transactionnel |
+| PP3 | Texte et typographie | **C T** : puces simples, numéros et liens filtrés ; le reste réemploie le texte existant | Pas de niveaux de liste, indentation, thème de texte, notes ni lien validé comme artefact ; l'aperçu sandboxé ne prouve pas le clic | Suffisant pour le 80/20 social ; ajouter un test de sécurité et d'export |
+| PP4 | Formes, images et médias | **Décision de réemploi** : formes, effets, images, focales et Unicode couvrent la carte | Aucun son ou vidéo posé, masque de média, suppression d'arrière-plan, catalogue d'icônes cohérent ni remplacement global ; les exclusions s'appuient sur l'affiche statique | Décision cohérente pour le social fixe ; rouvrir seulement avec un Reel réel |
+| PP5 | Tableaux, graphiques, SmartArt | **C T partiel** : cinquième type de calque, grille 1 à 8 par axe et `<table>` réel | Pas de headers, caption, style de ligne/colonne, collage tabulaire, données liées, graphique ou diagramme ; l'accessibilité de la table n'est pas prouvée | Garder le tableau minimal, puis fournir ces cas par composants HTML spécialisés si demandés |
+| PP6 | Transitions et animations | **C T partiel** : fondu, montée ou zoom d'un calque avec délai, seulement en aperçu interactif | Pas de transition par page, timeline, ordre, durée ni export vidéo exécuté ; l'animation inline vit dans l'iframe et n'est pas couverte par le `prefers-reduced-motion` du shell parent | Respecter d'abord reduced motion et prouver le navigateur ; reprendre un modèle temporel seulement après l'export fixe |
+| PP7 | Présentation et enregistrement | **C T minimal** : Page précédente ou suivante change la slide active ; le reste est explicitement écarté | Aucun mode présentateur, lecture plein écran, notes, répétition, enregistrement écran ou voix ; la navigation passe par `patchComposition` et pollue donc l'historique de contenu | Garder le raccourci, mais sortir l'état actif de la scène ; reporter le reste tant que la priorité reste le post social |
+| PP8 | Collaboration et export | **C T étroit** : une boucle recompile chaque slide et lance un téléchargement PNG ; collaboration écartée | Le test prouve seulement l'apparition du bouton et l'isolation du HTML, jamais l'export. Pas de ZIP, manifeste, QA par page, reprise ni reçu. Des téléchargements multiples peuvent être bloqués ; un titre de 60 caractères tronque le numéro final et peut donner le même nom à toutes les pages ; l'échelle mesurée de la page active est réutilisée pour les autres | Refactorer rasterisation et téléchargement, produire un seul paquet, contrôler chaque page, puis seulement parler d'export carrousel prêt |
+
+Lecture : les huit cartes PowerPoint possèdent désormais une décision ou une porte de code, mais
+PP8 confirme la distinction centrale de l'audit. La boucle existe ; le livrable multi-page, son
+contrôle et sa reprise ne sont pas prouvés. Il faut convertir cette boucle en paquet atomique avant
+de déclarer le carrousel prêt.
+
+## Miro
+
+Le KANBAN fixe finalement huit familles Miro pendant la seconde passe. Leur lecture doit tenir
+compte d'une différence de modèle : Miro travaille sur un espace infini, tandis que ZenRayMedia
+compose un format borné. La réutilisation est donc légitime pour les gestes, non pour conclure que
+ZenRayMedia fournit un board Miro.
+
+| # | Famille | Preuve observée | Ce qui manque pour la vision | Décision recommandée |
+|---|---|---|---|---|
+| M1 | Navigation dans le canevas | **C T**, réemploi du pan, du zoom et du cadrage | Pas de coordonnées mondiales, mini-carte, zones exportables ni preuve à 1 000 objets | Le canevas borné convient aux publications ; rouvrir l'infini seulement pour des plans réels |
+| M2 | Sélection simple et multiple | **C T**, réemploi de la sélection et du marquee | Même défaut de visibilité effective, d'instantané additif et de page que Photoshop | Réparer le socle commun, sans nouvelle sélection propre à Miro |
+| M3 | Déplacement, redimensionnement, rotation, duplication | **C T**, réemploi des poignées, guides, retournement et ordre | Historique par événement, boîte de groupe absente et manipulation du connecteur trompeuse | Une transaction par geste et une boîte cohérente précèdent toute extension |
+| M4 | Création et édition de texte | **C T**, réemploi de la typographie, de l'édition en place, des listes et liens | L'édition en place reste non fidèle ; aucun style de note sémantique | Le texte ordinaire suffit ; corriger la fidélité avant d'ajouter des variantes Miro |
+| M5 | Post-it, formes, cartes | **C T** : préréglage Post-it d'un calque texte ; formes réemployées ; cartes écartées | Le centrage dépend d'une règle CSS qui écrase le réglage vertical ; aucun contrat sémantique de note | Garder le préréglage, corriger l'alignement et ne créer un type Carte qu'avec un usage de données |
+| M6 | Connecteurs, lignes et flèches | **C T étroit** : ligne SVG entre centres, géométrie recalculée | Le connecteur est créé hors diapositive, peut relier des pages différentes, garde le fond CSS d'une forme et devient un rectangle si une extrémité disparaît ; pas de ports, flèche, routage, copie ou duplication sûre | Classer l'état actuel comme prototype ; imposer appartenance de page, identité de relation et tests de rendu avant usage |
+| M7 | Structuration, ordre, groupes, alignement, frames, verrous | **C T** par réemploi ; frames écartées | Les groupes de diapositive sont exposés comme groupes ordinaires : grouper, dissoudre ou supprimer peut casser l'appartenance à la page ; pas de frame géométrique | Protéger les groupes système et créer un vrai modèle Page avant toute frame |
+| M8 | Collaboration, présence, permissions | **Décision d'exclusion** | Aucun commentaire, présence, rôle, historique partagé ou synchronisation serveur | Exclusion cohérente aujourd'hui ; garder seulement révision et conflit asynchrones dans le document |
+
+Le 80/20 gestuel est donc largement réemployé, mais M6 n'est pas encore une relation de scène
+fiable. Avant tout plan ou schéma, le connecteur doit appartenir à une page, survivre aux copies et
+rester une ligne après la suppression d'un bout. Le canevas infini et la collaboration restent
+hors du chemin critique.
+
+## Illustrator
+
+La liste dictée est récupérée sans la remplacer par une taxonomie d'audit. Elle couvre sélection,
+tracés, transformation, apparence, texte, organisation, images, plans de travail et export. Le
+détail sous-fonction par sous-fonction se trouve dans
+[10-ILLUSTRATOR-30-6.md](10-ILLUSTRATOR-30-6.md).
+
+| # | Famille dictée | Chevauchement actuel | Manque réel | Décision recommandée |
+|---|---|---|---|---|
+| I1 | Sélection et édition directe des objets | **C T U partiel** : objet, sélection multiple, rectangle et hiérarchie ; I2 expose une ancre | Pas de segment ou multi-ancre, lasso, baguette, isolation, sélection de groupe progressive ni préférences | Réparer visibilité, page et transform du pointeur avant d'étendre les modes |
+| I2 | Création et modification de formes et de tracés vectoriels | **C T U partiel** : cinq formes paramétriques, Plume Bézier, ancre, poignées, ouverture et fermeture au commit `5ceae3a` | Pas de Crayon, Shape Builder, Pathfinder, formes composées ou découpe ; appartenance de page, transaction, rotation, insertion et preuve navigateur restent ouvertes | Stabiliser la Plume comme R12, sans ouvrir un second outil vectoriel |
+| I3 | Transformation, positionnement, alignement et arrangement | **C T U partiel** : déplacement, taille, rotation, flip, alignement, distribution, ordre, copie et historique | Cisaillement, répétition, objet clé, référence, collage relatif et politique de mise à l'échelle absents ; historique par mouvement | Unifier matrice et transaction avant tout ajout |
+| I4 | Fond, contour, couleur, dégradé et apparence | **C T U partiel** : solide, linéaire, bordure, contour de tracé, opacité, fusion et effets CSS | Aucun radial, stops, caps, joins, pointillés, flèches, profils, styles ou pile d'apparence | Brancher d'abord le Critique sur le rendu réel |
+| I5 | Création, édition et mise en forme du texte | **C T U partiel** : bloc HTML, police, taille, graisse, italique, interlettre, interligne, alignement et listes simples | Texte ponctuel, sur tracé, vertical, plage riche, crénage, paragraphes, colonnes, Touch Type et japonais absents | Porter langue, polices et débordement avant les effets vectoriels |
+| I6 | Organisation par groupes, calques, empilement et masques | **C T U partiel** : pile, dossiers plats, recherche, visibilité, verrou, ordre | Aucun groupe imbriqué, calque documentaire, isolation, ciblage d'apparence, masque d'écrêtage ou d'opacité | Séparer Page, groupe, masque de page et masque vectoriel |
+| I7 | Placement, liaison, incorporation et vectorisation des images | **C T U partiel** : image Create, dépôt, boîte `cover`, point focal et tentative d'incorporation des `img` à l'export au commit `2156228` | Une erreur CORS laisse silencieusement la source distante ; aucun panneau Liens, état lié ou incorporé, mise à jour, remplacement global, origine, crop réel ou vectorisation | Construire provenance, état et résolution d'actif ; rendre l'échec d'incorporation bloquant avant Image Trace |
+| I8 | Plans de travail, canevas et exportation | **C T U partiel** : 27 formats, canevas borné, diapositives et boucle PNG | Diapositive non canonique, aucun plan spatial, taille propre, sélection multiple, formats/échelles simultanés, lot atomique ou SVG vérifié | Le modèle Page et les artefacts précèdent l'outil Plan de travail |
+
+La Plume rend le terme « vecteur » enfin concret, mais elle ne change pas l'ordre du produit : le
+premier gain vient de sa stabilisation, puis de la page et de la livraison, non d'une imitation
+successive de Pathfinder, Touch Type et Image Trace.
+
+## Conclusion de couverture
+
+La largeur fonctionnelle se répartit ainsi :
+
+- Slate fournit le mobilier et les gestes, avec une famille volontairement écartée ;
+- Photoshop fournit presque toutes les primitives de composition, sans atteindre encore la
+  robustesse de production ;
+- Figma fournit des versions réduites des contraintes, de l'Auto Layout et des instances, dont le
+  modèle doit être durci ;
+- PowerPoint commence à introduire des pages, mais ne les livre pas encore ;
+- Miro possède huit décisions et un prototype de connecteur qui demande encore une reprise de
+  modèle ; Illustrator possède huit cartes indexées, mais seulement deux ajouts de code, la Plume
+  et l'incorporation d'images, dont la profondeur reste nettement inférieure au statut `8/8` ;
+- la galerie et la publication, qui constituent pourtant la finalité de la vision II, ne sont la
+  famille principale d'aucun des six tableaux.
+
+Ce dernier point explique l'écart global. Un axe transverse hors décompte, « Produire et publier »,
+doit gouverner les six matrices : source, pages, variantes, QA, export, livraison, publication et
+galerie.

@@ -1,0 +1,129 @@
+# Attaque des documents 05, 06 et 07 : ce qui manque, du plus grave au plus bénin
+
+## Ce que j'ai lu de ma main pour cette passe
+
+Lus en entier : `src/zenraymedia/composition.js` (156 lignes), `document.js` (148), `compile.js` (352), `exporters.js` (202), `critic.js` (254), `forge.js` (133), `formats.js` (105), `htmlTemplate.js` (117), `componentCatalog.js` (55), `docs/zenraymedia/KANBAN.md` (111). Lus par extraits ciblés et vérifiés à la ligne : `MediaApp.jsx` (L1 à L300, L555 à L900, L1069 à L1158), `media.css` (L1 à L60, L185 à L260), `src/config/colors.js` (L1 à L110), `scripts/zrm-build-theme.mjs` (L180 à L220 et L355 à L372), `contracts.js` (L80 à L150), `themes/registry.js` (L1 à L40 et L120 à L160). Vérifications par recherche exhaustive dans `src/` : `data-panes`, `props.fit`, `.sound`, les importateurs de `config/colors.js`, les occurrences de `#0a84ff`.
+
+Non ouverts : `cut.js`, `declensions.js`, `publish.js`, `fonts.js`, `themeFonts.js`, `taxonomy.js`, et les `parts/` du thème T-04-1-1 autrement que par leur nombre, qui est de trente-six. Ce que j'avance sur ces fichiers, quand j'y suis contraint, est signalé comme non vérifié.
+
+---
+
+## 1. Le Critique est aveugle sur la voie Lego, or c'est la seule voie de l'éditeur à huit zones
+
+Le défaut. `inspectRendered` ne cherche que six classes, `.zrm-page` en L187, puis `.zrm-title, .zrm-beat-text, .zrm-standfirst, .zrm-byline, .zrm-kicker` en L214, `.zrm-beat-text, .zrm-standfirst` en L226 et `.zrm-beat-text` en L235. Or dès qu'un composant est posé, `compile()` bascule sur `composedPage` (`compile.js` L303) qui n'émet que `.zrm-lego-page`, `.zrm-lego-row` et `.zrm-lego-item` (L229, L244 à L246) et pas une seule de ces six classes. La mesure retombe donc sur `doc.body`, aucune boucle de zone de sécurité ne trouve d'élément, aucun plancher de corps n'est vérifié.
+
+La preuve chaînée est plus lourde encore. La boucle d'ajustement mesuré de `MediaApp.jsx` L257 à L264 ne se déclenche que sur les codes `overflow.*` et `safe.*`, qui ne peuvent plus apparaître ; et `composedPage` n'emploie nulle part la variable `scale` qu'il reçoit, comme le montre son CSS complet L237 à L256. Une composition posée sur un format à canevas fixe ne peut donc, aujourd'hui, ni être mesurée ni être ramenée dans sa boîte.
+
+Ce que les documents en font. Le 05 propose en zone 8 de rapatrier le verdict du Critique dans la barre du bas, et le 06 lui ajoute trois contrôles d'animation. Les deux construisent sur un poste qui ne mesure rien de ce qu'ils affichent, et le résultat visible serait le pire des deux mondes, un verdict vert et lisible sur une page jamais mesurée.
+
+La correction. Avant de déplacer le verdict, apprendre à `inspectRendered` la voie composition : mesurer `.zrm-lego-page` comme boîte, parcourir les nœuds de texte réels des `.zrm-lego-item` pour le plancher de lisibilité et les zones de sécurité, et faire consommer `scale` par `composedPage`, faute de quoi la réduction automatique reste morte.
+
+## 2. L'export PNG perd le fond et tous les attributs de l'élément racine
+
+Le défaut. `exportPng` construit un `div` enveloppe et n'y recopie que les `<style>` et les enfants de `body` (`exporters.js` L127 à L131). Il n'existe donc, dans l'image produite, ni élément `html` ni élément `body`. La règle `html,body{margin:0;min-height:100%;background:var(--zrm-paper,var(--zrm-bg,#fff));color:…}` de `compile.js` L242 ne s'applique à rien, et le canevas est peint en blanc en dur par `ctx.fillStyle = '#ffffff'` (L148). Les attributs `data-zrm-dark`, `data-zrm-theme`, `data-zrm-composed` que `composedPage` écrit sur `<html>` (L259) disparaissent avec lui.
+
+Conséquence directe pour le document 07, qui conçoit un client de streaming sombre : son export en image sort sur fond blanc, avec du texte clair. Conséquence pour le document 06, qui consacre un long passage au PNG et à `freezeAt` sans jamais relever que le chemin `foreignObject` perd déjà le fond, ce qui est un défaut plus banal et plus certain que celui qu'il anticipe.
+
+La correction. Recopier les attributs de l'élément `html` source sur le `div` enveloppe, et remplacer le blanc en dur par la couleur de fond réellement calculée, lue sur le document parsé plutôt que devinée. Deux modifications courtes, à faire avant tout travail d'animation.
+
+## 3. Aucun format n'accueille une interface de client de streaming
+
+Le défaut. `F-web-article` pose `canvas: { w: 820, h: 0 }` (`formats.js` L21), et `.zrm-lego-page` plafonne à 1180 px (`compile.js` L244). Les six formats que le document 07 déclare sont donc tous soit étroits, soit des affiches à un ou deux blocs (`fit.maxBeats` valant 1 ou 2, `formats.js` L27, L34, L41, L57, L66). Une barre latérale, une liste de pistes à cinq colonnes et un panneau de droite ne tiennent pas dans 820 px, et le document 07 ne discute la largeur qu'au niveau de la grille de ligne, jamais au niveau du format.
+
+La correction. Décider maintenant, et l'écrire : soit un septième format d'application web, par exemple 1440 sur hauteur libre avec `density: 1`, soit l'engagement explicite que le thème 09 ne rend jamais son écran entier mais seulement des fragments, auquel cas la part `01` de chrome complet n'a pas de raison d'exister.
+
+## 4. L'annulation n'appartient à aucune des huit zones
+
+Le défaut. `patchComposition` (`MediaApp.jsx` L184 à L191) remplace l'état sans en garder l'histoire, ce que le tableau reconnaît déjà en carte C3 (`KANBAN.md` L70 à L74). Le document 05 énumère pourtant les cinq actions de document de la zone 1, qui correspondent aux boutons L667 à L671, sans y placer ni annuler ni refaire, et aucune autre zone ne les réclame. Un éditeur calqué sur UMG sans `⌘Z` n'est pas un éditeur.
+
+La correction. Attribuer explicitement l'annulation à la zone 1, poser la pile dans `patchComposition` puisque le modèle est déjà immuable, et le faire avant la carte d'animation, car une timeline multiplie les gestes destructeurs par instance et par clip.
+
+## 5. La durée de la timeline n'a aucun chemin vers la Forge
+
+Le défaut. `renderScript` calcule `FRAMES` depuis `durationSeconds` (`forge.js` L45 à L49) et `forgePlan` fixe cette durée par `durationOf(cut, format)` (L101), c'est à dire la somme des durées de beats bornée par `format.time.min` et `max` (`formats.js` L91 à L96). Pour `F-video-1920x1080`, ces bornes valent 10 et 90 secondes (L59). Une timeline de deux secondes rendrait donc dix secondes de fichier, et une chorégraphie de deux minutes serait coupée à quatre-vingt-dix secondes, sans qu'aucun message ne le dise.
+
+Le document 06 pose `timeline: { v, duration, fps, loop, poster }` et n'en relie aucun champ à ce calcul. Le champ `fps` est dans le même cas : le script emploie `format.time.fps` (L46), jamais celui de la timeline, et l'arithmétique des sept durées présentée au paragraphe 2 du document 06 suppose qu'on puisse choisir 60 images par seconde, ce qu'aucun format ne permet aujourd'hui.
+
+La correction. Faire lire la timeline par `durationOf` quand elle existe, ou passer la durée explicitement à `forgePlan`, et ajouter au Critique un contrôle bloquant lorsque `timeline.duration` sort des bornes du format, puisque le fichier sortirait alors faux plutôt qu'absent.
+
+## 6. Les propriétés de ligne seraient effacées à chaque geste, et le document 06 ne signale que la moitié du problème
+
+Le défaut. `normalizeComposition` conserve les champs inconnus d'un item par étalement (`composition.js` L25 à L30), ce que le document 06 relève justement, mais reconstruit chaque ligne en littéral strict `{ id, items }` (L23 à L24) : tout champ posé sur une ligne est perdu. Et cette fonction n'est pas appelée seulement au chargement, elle l'est en tête de `insertItem` L89, `addComponent` L104, `addImage` L110, `removeItem` L116, `moveItem` L127, `patchItem` L135 et `duplicateItem` L146, donc à chaque geste de l'utilisateur.
+
+Or c'est exactement au palier de la LIGNE que le document 05 place son unique gain livrable avant C7, l'UniformGrid par propriété de ligne, et il en fait un engagement de tableau. La perte serait silencieuse et immédiate : la colonne se réglerait, puis reviendrait à son état par défaut au clic suivant.
+
+La correction. Étaler la ligne comme on étale l'item, ajouter le test correspondant à `composition.test.js`, et traiter cette modification au même rang que celle de `timeline` que le document 06 réclame déjà.
+
+## 7. Le dépôt dans l'aperçu, tel qu'il est écrit, introduirait le bug qu'il prétend éviter
+
+Le défaut. Le document 05 engage l'aperçu à appeler `placementAt` sans la modifier, puis ajoute qu'il faut multiplier les coordonnées par `fitScale`. Les deux consignes se contredisent. `placementAt` (`MediaApp.jsx` L594 à L601) divise l'écart au bord par la largeur et la hauteur du rectangle de la cible : le résultat est un rapport, invariant d'échelle, et la boîte mesurée est déjà la boîte affichée, donc déjà mise à l'échelle. Multiplier par `fitScale` fausserait le seuil de 0,25 et rendrait les bords haut et bas inatteignables à faible zoom.
+
+Deuxième omission, plus lourde. L'aperçu est une iframe (`MediaApp.jsx` L857 à L864), et une iframe absorbe les événements de survol et de dépôt : aucun `dragover` du parent ne les recevra. La seule voie est un calque transparent posé au-dessus, exactement comme `.zrm-safe-overlay` L865 à L872, avec le repère de dépôt dessiné dessus.
+
+La correction. Réécrire l'engagement ainsi : le calque de dépôt appelle `placementAt` sur lui-même, sans conversion d'échelle d'aucune sorte, et l'identification de la pièce survolée passe par `document.elementFromPoint` dans le document de l'iframe, en coordonnées divisées par `fitScale`, ce qui est la conversion inverse de celle qui était annoncée.
+
+## 8. La barre du bas n'est pas un enfant de la grille, donc son repli ne vole rien à l'aperçu
+
+Le défaut. `footer.zrm-render` se trouve en `MediaApp.jsx` L1134, à l'intérieur de la section de bibliothèque ouverte L1069 et fermée L1153, laquelle est un panneau en `display: flex` colonne. La règle `grid-column: 1 / -1` que `media.css` L253 lui donne est donc inerte, puisqu'elle ne s'applique qu'à un enfant direct de grille. Quand la barre passe à deux lignes, elle prend de la place à la bibliothèque, qui occupe la troisième rangée `minmax(205px, 27vh)` (`media.css` L13), et l'aperçu ne bouge pas d'un pixel.
+
+Le document 05 cite cette barre en L1140 à L1156 et fonde son raisonnement de repli sur une hauteur volée à l'aperçu. La citation et le raisonnement sont l'un et l'autre à corriger.
+
+La correction. Sortir le footer comme enfant direct de `.zrm-shell`, ce que la règle CSS attend déjà depuis toujours, ou bien assumer par écrit qu'il vit dans la bibliothèque et écrire le repli en conséquence.
+
+## 9. Les types de propriétés promis à C1 dépassent ce que le moteur de gabarit sait faire
+
+Le défaut. `htmlTemplate.js` n'offre que quatre constructions, déclarées L6 à L9 et implantées par l'expression régulière unique L38 : valeur échappée, valeur brute, section et section inverse. Il n'existe ni condition, ni comparaison, ni sélection par valeur. Le document 07 emploie pourtant `choice`, `bool`, `number`, `color` et `image` sur quarante-sept composants, dont trois variantes de rangée de piste.
+
+Deux pièges concrets. Un `choice` à trois valeurs ne peut piloter le rendu qu'au prix d'une section par valeur possible, ce qui multiplie le balisage. Et une valeur booléenne sérialisée en chaîne, `"false"`, est vraie pour `{{#clé}}` puisque la section teste la vérité de la valeur (L79) : une case décochée afficherait le bloc.
+
+La correction. Soit restreindre C1 aux types que le moteur porte réellement, texte, couleur, nombre, image et booléen strictement typé, soit ajouter au moteur la forme `{{#clé.valeur}}` par aplatissement de la portée, ce qui est une ligne dans `lookup` et un test.
+
+## 10. Le garde-fou de génération refuse un thème dont aucune part n'itère sur les beats
+
+Le défaut. `scripts/zrm-build-theme.mjs` L365 et L366 lève une exception si le gabarit produit ne contient pas `{{#beats}}` ou ne contient pas `{{title}}`, avec le message « il serait muet ». Le document 07 cite le garde-fou voisin sur les adresses distantes (L364) et passe sur ces deux là. Or quarante-sept parts d'interface de lecteur audio n'ont aucune raison naturelle d'itérer sur les beats d'un article.
+
+La correction. Décider maintenant quelle part porte la boucle, la liste de pistes étant la candidate évidente puisqu'elle est déjà une répétition, et l'écrire dans la conception du thème. Sinon le thème ne se génère pas, et l'échec arrive à la toute fin, après l'écriture des quarante-huit fichiers.
+
+## 11. La compilation exige un article valide, même pour une composition entièrement autonome
+
+Le défaut. `MediaApp.jsx` L211 refuse de compiler si `validate('cut', cut)` renvoie la moindre erreur, et `validateCut` exige au moins un beat portant un rôle connu et un texte non vide (`contracts.js` L87 à L93). Une composition faite de pièces qui portent leurs propres valeurs, ce que C1 promet et ce que le thème 09 suppose de bout en bout, resterait donc suspendue à un article fictif que personne ne lira. Aucun des trois documents ne le mentionne.
+
+La correction. Autoriser la compilation dès que la composition est non vide, même sans cut valide, et le poser comme dépendance explicite de C1 plutôt que de le découvrir à l'usage.
+
+## 12. Les icônes n'ont pas de surface pour être posées une par une
+
+Le défaut. L'onglet Icônes de la bibliothèque filtre les entrées du registre par l'expression `/icon/i` appliquée à l'identifiant et au nom (`MediaApp.jsx` L555 à L563). Sur un thème réel, il ne reste qu'une entrée, la planche `00-icons`, et la poser insère la planche entière. Le document 07 ajoute quatorze symboles à cette planche et le document 05 annonce que la bibliothèque « se réutilise intégralement » : ni l'un ni l'autre ne donne le moyen de poser une icône seule.
+
+La correction. Faire lire à la palette les identifiants de `<symbol>` de `definitionsHtml`, que `componentCatalog.js` L45 met déjà de côté, pour en fabriquer des entrées virtuelles ; ou renoncer explicitement à poser une icône comme pièce, ce qui est défendable mais doit être écrit.
+
+## 13. Une propriété d'image est écrite et jamais lue
+
+Le défaut. `imageInstance` pose `props: { fit: 'cover', radius: 18, ratio: '16 / 9' }` (`composition.js` L71), mais `fit` n'est lu nulle part dans `src/zenraymedia/`, vérifié par recherche : `composedPage` écrit `object-fit: cover` en dur (`compile.js` L248). Le document 05 désigne `ratio` et `radius` comme les deux premiers champs à câbler dans la zone Détails, et laisse le troisième dans l'ombre alors qu'il est déjà sérialisé dans tous les documents enregistrés.
+
+La correction. Câbler `--zrm-image-fit` dans `composedPage` au même endroit que le ratio et le rayon, ou retirer la clé du modèle. Un champ écrit et jamais lu finit toujours par être cru.
+
+## 14. La couleur unique n'est pas atteignable depuis la feuille de style de l'éditeur
+
+Le défaut. Aucun fichier de `src/zenraymedia/` n'importe `src/config/colors.js`, vérifié : les seuls importateurs sont `App.jsx`, `ImageNodeViewer.jsx`, `mediaProvenance.js` et `PlanBoard.jsx`. Or `media.css` est une feuille statique, elle ne peut pas lire une constante JavaScript. L'engagement du document 05, « toute zone touchée lit `UI.blue` », n'est pas implantable tel quel.
+
+Deux précisions que les documents omettent. `UI.blue` vaut `#4295f7` (`colors.js` L45) quand le repère de dépôt vaut `#0a84ff`, donc la substitution change la teinte de l'acquis, ce qui doit être assumé et non subi. Et `media.css` porte aussi `#ff453a`, `#ff9f0a` et `#30d158` dans les blocs Critique et verdict (L233 à L247), qui relèvent de la même règle et ne sont mentionnés nulle part.
+
+La correction. Écrire les sept couleurs en propriétés personnalisées une fois, sur `.zrm-shell`, depuis le JavaScript qui monte l'application, puis remplacer les quatre teintes en dur par ces variables.
+
+## 15. La timeline propose une piste de son alors que le son n'existe nulle part
+
+Le défaut. Le document 06 attribue `UI.green` aux pistes de son. Le vocabulaire existe, `sound` figure parmi les sept groupes de thème (`contracts.js` L106) et `htmlThemeShell` le remplit d'une coquille vide (`themes/registry.js` L136), mais aucun module ne lit `theme.sound`, vérifié par recherche sur `src/zenraymedia/`. Surtout, `ffmpegCommand` n'ouvre aucune entrée audio (`forge.js` L18 à L33) et le script de rendu ne pousse que des images PNG dans le tube (L87 à L89).
+
+La correction. Retirer la piste de son de la conception de la timeline, ou ouvrir une carte séparée qui aille jusqu'au bout, entrée audio dans la commande ffmpeg comprise. Une couleur de piste ne fait pas un pipeline.
+
+## 16. La lecture de la timeline sera détruite par la recompilation à chaque frappe
+
+Le défaut. L'aperçu reçoit son contenu par `srcDoc` débouncé à 220 ms (`MediaApp.jsx` L219 et L861). Toute modification recharge le document de l'iframe, donc détruit les objets d'animation que le document 06 propose de piloter par `getAnimations()` et `currentTime`. Le document décrit le mécanisme de lecture sans dire ce qui se passe quand on règle un clip pendant la lecture, ce qui est précisément le geste courant.
+
+La correction. Repositionner l'horloge dans `onFrameLoad` (L243), qui existe déjà et sert au Critique, à partir de l'instant courant conservé côté React. Cela transforme le rechargement en simple saut d'image plutôt qu'en retour à zéro.
+
+## 17. Citations de lignes à recompter avant toute implantation
+
+Plusieurs renvois des documents 05 et 06 ont glissé de quelques lignes, sans conséquence de raisonnement mais avec un coût réel au moment d'ouvrir le fichier. Vérifiés : la charge utile `application/x-zenray-component` est en L1121 et non L1123, la section de bibliothèque commence en L1069 et non L1067, le footer de rendu est en L1134 et non L1140. Vérifiés exacts en revanche : `placementAt` L594, `data-drop` et ses quatre règles `media.css` L218 à L227, `PLACEMENTS` `composition.js` L9, `data-zrm-instance` `compile.js` L214 et L227, `data-panes="three"` `MediaApp.jsx` L647 comme unique occurrence dans `src/`, les deux replis inutilisés `media.css` L21 et L22, les sept clefs recopiées par le registre `zrm-build-theme.mjs` L194 à L202, et les six feuilles de tokens importées en statique `componentCatalog.js` L14 à L21.
+
+Une remarque de méthode pour finir. Le document 07 reconnaît n'avoir aucune capture, `docs/zenraymedia/references-jpeg/` n'existant pas, ce que j'ai revérifié. Tant que ce dossier est vide, les quarante-sept composants sont une hypothèse de découpe et non une reconstruction mesurée, et le skill `zenraymedia-theme-from-captures` décrit précisément le chemin inverse. Le thème T-04-1-1, lui, compte trente-six parts, ce qui donne l'ordre de grandeur réel de l'effort par thème.

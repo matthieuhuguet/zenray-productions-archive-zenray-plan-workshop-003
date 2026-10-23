@@ -1,0 +1,176 @@
+# Exigences, corpus et preuve de complétude
+
+Ce registre ferme la seconde passe de l'audit. Il ne devient ni une vision parallèle ni un nouvel
+état vivant : il montre ce qui est inspecté, ce que chaque preuve permet d'affirmer et ce qui reste
+inconnu. Les décisions de produit demeurent dans `VISION.md` ; l'état des cartes demeure dans
+`KANBAN.md`.
+
+## Contrat de la demande
+
+| Exigence | Preuve produite | État de couverture |
+|---|---|---|
+| Analyser toute la documentation ZenRayMedia | Inventaire des 421 Markdown antérieurs à l'audit, lecture intégrale des sources uniques et contrôle structurel des corpus répétitifs | Couvert, avec limite explicite sur le jugement image par image |
+| Analyser tout le code ZenRayMedia | Tous les modules de `src/zenraymedia`, les raccords `src/App.jsx` et `src/create/node.js`, les thèmes, tests et outils `zrm-*` sont tracés | Couvert statiquement |
+| Vérifier les dernières fonctions | Les commits Slate, Photoshop, Figma, PowerPoint, Miro et Illustrator I1 à I8 sont reliés aux fonctions et aux tests dans `09-INVENTAIRE-MICRO-FONCTIONS.md` ; I2 et I7 reçoivent une revue détaillée dans `10-ILLUSTRATOR-30-6.md` | Couvert jusqu'au commit `2156228` |
+| Examiner tous les logiciels et huit familles | Matrice de 48 lignes dans `02-MATRICE-6-LOGICIELS-8-FAMILLES.md` | Couvert pour les six logiciels de la vision II |
+| Identifier les familles absentes | La liste dictée I1 à I8 d'Illustrator est désormais indexée ; l'audit distingue les cinq cartes de réemploi ou exclusion, les deux ajouts I2/I7 et leurs sous-fonctions absentes | Couvert sur le périmètre final 6 × 8 ; InDesign est explicitement exclu |
+| Comparer le code à toute la vision | Les trois strates, le contrat opératoire et dix critères de résultat sont dans `01-VISION-ET-ECARTS.md` | Couvert |
+| Trouver ce qui manque à la documentation | Hiérarchie, contrats, statuts, thèmes, formats, preuves et corpus sont audités dans `05-DOCUMENTATION-THEMES-TESTS.md` et ci-dessous | Couvert |
+| Trouver ce qui manque au code | Données, rendu, sécurité, reprise, export, publication et performance sont suivis dans `03-CODE-ARCHITECTURE-DONNEES.md` | Couvert |
+| Proposer les futures générations de code | Lots G0 à G9 et backlog P0 à P5, écrits seulement dans l'audit | Couvert sans code applicatif |
+| Proposer une UX/UI intégrale et rapide | Galerie, création, éditeur, variantes, livraison, budgets de clics, accessibilité et tests d'usage sont décrits dans `04-UX-UI-PARCOURS.md` | Couvert sans maquette ni code |
+| Ne modifier aucun code réel | Les écritures de l'audit restent confinées aux documents externes, à leur lien d'index, au journal append-only et à l'état temporaire ; les diffs applicatifs concurrents sont protégés et attribués à leurs travaux propres | Porte de clôture par attribution des écritures |
+| Écrire hors de la documentation vivante et relier à l'index | Tous les constats vivent sous `audits/2026-08-06/` ; `docs/zenraymedia/README.md` ne reçoit qu'un lien d'index | Couvert |
+
+## Corpus documentaire compté
+
+Avant les fichiers de cet audit, `docs/zenraymedia` contient 421 fichiers Markdown et 143 880
+lignes. Leur répartition montre que la taille brute vient surtout de deux corpus répétitifs, qui
+doivent être contrôlés comme des jeux de données plutôt que lus comme 395 décisions distinctes.
+
+| Ensemble | Volume observé | Contrôle effectué | Résultat |
+|---|---:|---|---|
+| Racine de `docs/zenraymedia` | 15 Markdown | Lecture des fichiers de vision, état, plans et contrats | Les deux sources dites vivantes coexistent avec plusieurs contrats archivés encore utilisés par le code |
+| `v1/` | 11 Markdown | Lecture intégrale | État historique utile, métriques et formats périmés |
+| `_source-matthieu/` | 262 Markdown | Lecture des index, prompt V3, Volume A, inventaire et validation de chaque fichier répétitif | Le prompt V3 contient encore la chaîne aval absente de la vision opératoire |
+| `ateliers/` | 133 Markdown | Inventaire des 128 ateliers, parse des totaux et inspection des fichiers hors atelier | Couverture limitée aux familles 01 et 04 ; 33 ateliers restent sous leur cible et quatre n'exposent pas de total normalisé |
+| Catalogues `05-THEMES-1024-A/B/C/D.md` | 1 024 lignes de thème | Identifiants, unicité, familles et cardinalités | 1 024 identifiants uniques, 256 par catalogue, 64 dans chacune des 16 familles, aucun trou ni doublon |
+
+La lecture exhaustive signifie ici que chaque fichier unique entre dans la revue et que chaque
+élément d'un corpus régulier passe un contrôle de structure, d'identité et de raccordement. Elle ne
+signifie pas que des milliers de captures presque homogènes reçoivent un jugement esthétique
+individuel, lequel exigerait un protocole visuel séparé et une validation humaine.
+
+## Chaîne des thèmes, du catalogue au runtime
+
+| Niveau | Cardinalité | Couverture exacte | Rupture observée |
+|---|---:|---|---|
+| Catalogue | 1 024 thèmes | 16 familles, huit sous-familles, huit variantes | Taxonomie complète sur le papier |
+| Prompts Volume A corrigé | 256 prompts | Familles 01 à 04, 64 prompts par famille | Les 768 autres thèmes n'ont pas ce paquet de prompt dans ce volume |
+| Index et checklist du Volume A | 256 + 256 identifiants | Uniques et complets, aucun identifiant manquant | La présence documentaire ne prouve ni atelier ni thème exécutable |
+| Ateliers de références | 128 ateliers | 64 pour la famille 01 et 64 pour la famille 04 | Aucun atelier équivalent pour les 14 autres familles |
+| Thèmes chargeables | 8 entrées | `T-01-1-1` à `T-01-1-5`, `T-01-3-2`, `T-04-1-1`, `T-09-1-1` | 0,78 % du catalogue arrive dans `listThemes()` |
+| Paquets à composants | 7 dossiers | 210 pièces, soit 25, 25, 26, 25, 25, 36 et 48 pièces | Un huitième thème reste un module JS d'un autre type |
+| Métadonnées de propriétés | 206 propriétés | 47 des 48 composants Spotify seulement | Les six autres paquets ne déclarent aucune propriété éditable dans leur registre |
+| Tests | Chargement et cohérence partiels | Fichiers de registre présents, imports et quelques contrats sont exercés | Aucun golden visuel, budget de poids, migration de paquet ou matrice thème par format |
+
+Les 210 fichiers de pièce sont tous présents dans leur registre, sans fichier référencé manquant ni
+pièce orpheline. Ils contiennent tous une balise `style`, 87 utilisent des variables de gabarit,
+aucun n'embarque de `script`, de gestionnaire inline ou d'URL externe. Cette hygiène n'efface pas
+le défaut de contrat : 44 identifiants HTML fixes sont répartis dans deux paquets et deviennent
+dupliqués dès qu'une même pièce est instanciée plusieurs fois.
+
+Le registre Spotify contient en outre une propriété invalide sur `15-cover-frame`, avec la clé
+`16` et le type `9`, alors que les types observés et attendus sont `text`, `bool`, `color`, `number`
+et `choice`. Ni le chargeur ni la validation actuelle ne bloquent cette entrée.
+
+## État réel des ateliers
+
+Chaque répertoire attendu des familles 01 et 04 existe et porte exactement un Markdown principal
+de captures. Parmi les 128 ateliers, 124 exposent un total lisible par le même parseur : 91
+atteignent ou dépassent leur cible, tandis que 33 restent incomplets. Les quatre ateliers sans
+métrique normalisée sont `T-01-1-2`, `T-01-1-3`, `T-01-1-4` et `T-01-1-5`.
+
+La famille 01 compte 60 métriques, toutes au moins complètes, pour 541 références sur 480 demandées.
+La famille 04 compte 64 métriques, dont 31 complètes et 33 incomplètes, pour 3 143 références sur
+3 584 demandées. Les manques exacts sont les suivants.
+
+| Sous-famille | Ateliers sous la cible, références présentes sur cible |
+|---|---|
+| `T-04-1` | `1-8` 31/56 |
+| `T-04-2` | `2-2` 55/56 ; `2-3` 48/56 ; `2-6` 55/56 ; `2-7` 54/56 ; `2-8` 50/56 |
+| `T-04-3` | `3-4` 55/56 ; `3-7` 53/56 |
+| `T-04-4` | `4-3` 16/56 ; `4-4` 49/56 ; `4-7` 49/56 ; `4-8` 45/56 |
+| `T-04-5` | `5-1` 38/56 ; `5-4` 51/56 ; `5-5` 54/56 ; `5-6` 8/56 |
+| `T-04-6` | `6-1` 44/56 ; `6-2` 36/56 ; `6-3` 32/56 ; `6-4` 31/56 ; `6-5` 54/56 ; `6-6` 45/56 ; `6-7` 40/56 ; `6-8` 8/56 |
+| `T-04-7` | `7-2` 43/56 ; `7-3` 53/56 ; `7-5` 55/56 ; `7-7` 31/56 |
+| `T-04-8` | `8-1` 55/56 ; `8-3` 55/56 ; `8-4` 53/56 ; `8-5` 49/56 ; `8-8` 8/56 |
+
+Le mot « complet » ne doit donc pas être appliqué au corpus d'ateliers. Une page vivante doit
+publier ces quatre états distincts : non commencé, métrique absente, incomplet, cible atteinte.
+
+## Contrat archivé contre paquet exécutable
+
+Chaque prompt du Volume A possède les sections 0 à 13 et les 17 champs YAML attendus : identité,
+famille, calibration, signature, langue, sortie, actifs, composants, namespace, racine et régime de
+droit. Le gabarit demande notamment au moins 32 paquets de composants, 64 à 256 actifs avec une
+cible de 96, un dossier par composant avec HTML, CSS, JS, schéma, manifeste et aperçu, ainsi qu'un
+attribut racine `data-zrm-component`.
+
+Le runtime suit un autre contrat : une pièce est généralement un seul fichier HTML autonome, son
+registre est central au paquet, les scripts sont absents, aucun des 210 fichiers n'emploie
+`data-zrm-component`, et cinq paquets de presse restent sous les 32 composants du prompt archivé.
+Cette différence peut être une simplification volontaire ; puisqu'aucun document vivant ne la
+nomme, elle reste toutefois impossible à distinguer d'une fabrication inachevée.
+
+Le document vivant manquant n'est donc pas un nouveau prompt. Il s'agit d'un `THEME-PACKAGE.md`
+court, versionné, qui tranche pour chaque règle archivée : conservée, remplacée, reportée ou
+abandonnée. Son schéma doit être validé au chargement et porter au minimum `id`, `version`, nom,
+famille, formats, composants, propriétés, polices, actifs, droits et compatibilité du moteur.
+
+## Vision indexée sur les preuves
+
+| Promesse de vision | Capacité actuelle | Preuve insuffisante ou absence | Document de décision nécessaire |
+|---|---|---|---|
+| Éditeur UMG en huit zones | Géographie de l'interface présente | Responsive, clavier, focus et persistance des panneaux non validés au navigateur | Contrat d'interface et test d'usage |
+| Pile de calques façon Photoshop | Calques absolus, ordre, groupes, effets, historique | Gestes non transactionnels, groupe sans géométrie, sélection effective incohérente | Contrat de scène et de commande |
+| HTML aplati | Compilation autonome disponible | Trois chemins de compilation divergent, ressources et sécurité non prouvées | Contrat unique de rendu |
+| Sous-composants éditables | Arbre DOM et overrides locaux | Chemins positionnels, limite de texte, vide impossible, migration absente | Schéma d'identité des nœuds |
+| 80/20 de six logiciels | 48 décisions ou prototypes tracés | « Porte verte » confond parfois code, intégration, validation et aptitude à livrer | `CAPABILITES.md` avec états C/T/I/V/R |
+| Illustrator | I1 à I8 sont indexées ; I2 publie un modèle de tracé SVG et I7 tente l'incorporation d'images à l'export | I3 à I6 et I8 ne sont que réemploi ou exclusion ; I2 conserve dix-sept écarts et I7 huit limites de ressource et de preuve recensées dans le document 10 | Publier pour chaque carte Décidé, Présent, Testé, Intégré, Validé et Prêt, jamais une fraction seule |
+| InDesign | Brouillon D1 à D8 apparu après la photographie | Hors périmètre par instruction explicite de clôture | Auditer séparément si ce chantier devient actif |
+| Création très rapide | Templates, composants et palette existent | Pas de parcours guidé depuis le canal jusqu'au livrable, commandes trop nombreuses et dispersées | Contrat de parcours et budget de clics |
+| Média très complexe | Calques, composants, tableaux, pages partielles, connecteurs | Deux modèles de scène, pages incomplètes, variantes absentes | Document canonique `Project/Page/Scene/Variant` |
+| Toutes les formes | Formes CSS paramétriques et premier chemin SVG éditable dans Illustrator I2 | Pas d'opérations booléennes, d'import SVG sûr, de redimensionnement fiable du cadre ni de validation des transformations | Portée Illustrator explicite |
+| Publications Instagram et LinkedIn d'abord | 27 formats, PNG unitaire et boucle de slides | Pas de paquet contrôlé, adaptateur, remise, publication visuelle ou reçu | Contrat `Artifact/Delivery/Publication` |
+| Galerie de publications | Projets locaux et navigateur Create | Aucun objet Publication, statut, miniature, version ni filtre | Spécification de galerie minimale |
+| Articles | Ancien Cut, compilateur et publication Markdown | La voie article et la voie calques divergent ; le bouton Publier ignore la scène | Décider si article reste un usage de ZenRayMedia ou de Create |
+| Plans et plans architecturaux | Canevas borné, groupes, connecteur prototype | Échelle, unités, pages, flèches, routes, cotations et SVG manquent | Reporter jusqu'à un cas mesuré |
+| Courtes animations d'UI | Entrées de calque et commande Forge | Aucun artefact vidéo, timeline, audio, sous-titres ni validation | Contrat temporel après la sortie fixe |
+| Substance Designer/Painter | Aucun code requis | Explicitement reporté au moins trois mois | Garder hors backlog actif |
+| ZenRay Models | Aucun code requis | Annonce sans échéance | Garder hors ZenRayMedia |
+
+## Passe inverse de clôture
+
+La seconde boucle repart des affirmations finales, puis cherche une preuve qui les invalide. Elle
+ne trouve aucune nouvelle famille logicielle oubliée, mais elle falsifie plusieurs raccourcis de
+statut qui auraient autrement survécu à la première passe.
+
+| Affirmation finale examinée | Contre-preuve | Verdict |
+|---|---|---|
+| Illustrator est `8/8` | seules I2 et I7 ajoutent du code ; I3 à I6 et I8 réemploient ou excluent, tandis que leurs sous-fonctions centrales restent absentes | huit décisions, non huit capacités prêtes |
+| I7 rend les sorties autonomes | CORS ou réseau laisse l'URL, `data-src` est pris pour `src`, CSS/SVG/`srcset` échappent au collecteur et aucune attente n'est bornée | amélioration partielle, autonomie non garantie |
+| Une URL d'image forme une image liée | aucun identifiant, provenance, version, statut, mise à jour ou remplacement global n'existe | adresse externe, non cycle de lien |
+| Une diapositive équivaut à un plan de travail | Lego reste global, taille commune, groupes système destructibles ; Plume et connecteur peuvent devenir globaux | approximation d'interface, non modèle Page |
+| Dégradé et apparence couvrent I4 | le tracé affiche Dégradé, mais `fillOf` est désactivé pour lui ; aucune pile, cap, jointure ou masque | couverture de boîte seulement |
+| 774 tests prouvent le commit | trois tests appartiennent au diff Plan non suivi ; I7 ne teste que son helper et aucun fichier produit | 771 cas propres, preuve d'artefact absente |
+| Publier sert la vision sociale | le bouton écrit le Cut en Markdown, sans PNG, paquet, destination, reçu ni galerie | publication textuelle historique, non publication du média |
+
+Cette passe confirme l'ordre du backlog : corriger les contrats et fermer un carrousel vérifié
+apporte davantage de puissance réelle qu'une nouvelle carte logicielle.
+
+## Les cinq risques qui dominent la seconde passe
+
+1. **Écrasement du mauvais projet.** L'association Create, le SHA et le chemin restent globaux ;
+   changer de projet peut donc sauver le document courant sur la cible précédente.
+2. **Fausse confiance dans la sortie.** Un bouton et un test jsdom peuvent être verts tandis que
+   le PNG, le PDF, le lot ou la publication réelle échouent sans reçu ni reprise.
+3. **Corruption lente de la source.** Le format réécrit la géométrie, les slides réemploient des
+   groupes destructibles et le collage perd ou conserve mal les références.
+4. **Industrialisation impossible des thèmes.** Le catalogue, le prompt archivé et le paquet
+   runtime suivent trois contrats sans version ni migration commune.
+5. **Statut documentaire mensonger.** Les fractions `8/8` décrivent des décisions de carte, alors
+   que la galerie, les artefacts et les validations humaines restent absents.
+
+Les mitigations détaillées et les portes de test se trouvent dans les documents 03, 05, 06 et 10.
+Avant que ZenRayMedia puisse être dite puissante, le tracé vectoriel doit être stabilisé et une
+publication sociale entière doit devenir persistante, visible, vérifiable et transmissible.
+
+## Condition de clôture
+
+L'audit est fini lorsque chaque ligne du contrat de demande possède un livrable, que les 48 cellules
+des six familles logicielles sont présentes une fois, que les 233 exports nommés du commit stable
+sont inventoriés, que les quatre niveaux du corpus de thèmes sont
+comptés, que les liens Markdown sont valides, que la photographie Git est figée et qu'aucune
+écriture applicative n'est attribuable à l'audit. Toute nouvelle fonction postérieure exige un
+nouvel audit daté ; elle ne rend pas cette photographie fausse, mais elle change son périmètre.

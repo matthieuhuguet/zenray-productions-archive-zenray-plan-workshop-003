@@ -1,0 +1,92 @@
+# Audit intégral de ZenRayMedia
+
+Date de clôture documentaire : 2026-08-06, heure de Tokyo.
+
+Périmètre : documentation et code de `src/zenraymedia`, raccordement dans ZenRayProgress, thèmes,
+formats, scripts, tests et archives de conception. Aucun fichier applicatif n'est modifié par cet
+audit. La référence Git exacte et les vérifications finales figurent dans
+[07-TRACEABILITE.md](07-TRACEABILITE.md).
+
+Le périmètre final compte exactement six logiciels et 48 familles. Le brouillon InDesign D1 à D8,
+apparu après cette photographie, est exclu par instruction explicite de Matthieu.
+
+## Verdict
+
+ZenRayMedia possède déjà le noyau crédible d'un éditeur déterministe : huit zones inspirées de
+Slate, calques HTML absolus, composants éditables, 27 formats, huit thèmes chargeables, 210 pièces
+HTML, historique, contraintes, Auto Layout partiel et diapositives naissantes. Ce noyau sait
+composer et prévisualiser.
+
+La vision la plus récente ne se limite cependant plus à l'éditeur. Elle demande une galerie de
+publications qui permette de produire très vite un média Instagram ou LinkedIn, de le décliner,
+de vérifier chaque fichier livré, de le publier ou de le remettre à la plateforme, puis de le
+retrouver. Cette chaîne reste coupée après la composition : les pages sont incomplètes, le passage
+d'un format à l'autre altère la géométrie source, l'export multi-page se limite à plusieurs
+téléchargements non atomiques, le bouton Publier écrit un article Markdown plutôt que le média
+composé, et aucune galerie de publications ne conserve l'état du livrable.
+
+La priorité produit n'est donc pas d'additionner immédiatement les 48 familles des six logiciels.
+Elle consiste à fermer une tranche verticale :
+
+`source canonique -> pages -> variantes indépendantes -> contrôle -> fichiers vérifiés -> publication -> galerie`.
+
+Tant que cette tranche ne fonctionne pas de bout en bout, davantage de fonctions de Miro ou
+d'Illustrator augmentent la surface de l'éditeur sans rapprocher l'utilisateur de son résultat.
+
+## Mesures principales
+
+| Mesure | Valeur observée | Lecture juste |
+|---|---:|---|
+| Logiciels audités | 6 | Slate/UMG, Photoshop, Figma, PowerPoint, Miro et Illustrator |
+| Familles auditées | 48 | Exactement 8 par logiciel ; InDesign est hors périmètre de cette clôture |
+| Familles fermées ou explicitement écartées au dernier état stable audité | voir matrice | Une porte unitaire verte ne vaut ni test navigateur ni validation utilisateur |
+| Formats déclarés | 27 | Seulement 7 figurent dans l'arbre global de déclinaisons |
+| Thèmes décrits par le catalogue | 1 024 | 8 thèmes sont chargeables dans l'application, soit 0,78 % |
+| Paquets de composants | 7 | 210 pièces HTML au total |
+| Documentation Markdown ZenRayMedia avant cet audit | 421 fichiers, 143 880 lignes | Le dossier en compte 432 avec les onze fichiers d'audit ; le contrôle final des liens figure dans la trace |
+| Tests ZenRayMedia | 498 tests verts dans 11 fichiers | La suite est surtout unitaire et jsdom, sans parcours navigateur ZenRayMedia ; le commit stable contient 771 tests dans 58 fichiers |
+| Taille du composant principal | 3 589 lignes | Modèle, stockage, gestes, rendu et interface y restent mêlés |
+
+## Règle de lecture des statuts
+
+L'audit sépare cinq preuves que le tableau courant confond parfois :
+
+1. **Présent** : une branche de code existe.
+2. **Testé** : un test automatisé exerce cette branche.
+3. **Intégré** : le parcours complet l'atteint avec de vraies données.
+4. **Validé** : Matthieu observe le résultat et l'accepte.
+5. **Prêt** : le livrable final, les erreurs, la reprise et les performances satisfont un contrat
+   mesuré.
+
+Une carte « porte verte » prouve principalement le deuxième niveau. Elle ne doit jamais être
+présentée comme « 8/8 prêt » sans les trois niveaux suivants.
+
+## Dossier
+
+- [01-VISION-ET-ECARTS.md](01-VISION-ET-ECARTS.md) : vision canonique, résultats attendus,
+  contradictions et contrat produit manquant.
+- [02-MATRICE-6-LOGICIELS-8-FAMILLES.md](02-MATRICE-6-LOGICIELS-8-FAMILLES.md) : les 48 familles,
+  leur preuve actuelle, leur manque et la décision recommandée.
+- [03-CODE-ARCHITECTURE-DONNEES.md](03-CODE-ARCHITECTURE-DONNEES.md) : architecture, données,
+  sécurité, export, publication, performance et propositions de génération future.
+- [04-UX-UI-PARCOURS.md](04-UX-UI-PARCOURS.md) : refonte des parcours, réduction des clics,
+  accessibilité et critères d'usage.
+- [05-DOCUMENTATION-THEMES-TESTS.md](05-DOCUMENTATION-THEMES-TESTS.md) : dette documentaire,
+  système de thèmes, formats et stratégie de preuve.
+- [06-BACKLOG-PRIORISE.md](06-BACKLOG-PRIORISE.md) : ordre de construction, dépendances et portes
+  vérifiables, sans code applicatif.
+- [07-TRACEABILITE.md](07-TRACEABILITE.md) : sources lues, commandes, limites et conformité à la
+  demande.
+- [08-EXIGENCES-ET-PREUVES.md](08-EXIGENCES-ET-PREUVES.md) : contrat de la demande, exhaustivité
+  du corpus, état exact des ateliers et indexation de la vision sur les preuves.
+- [09-INVENTAIRE-MICRO-FONCTIONS.md](09-INVENTAIRE-MICRO-FONCTIONS.md) : les 233 exports nommés,
+  les intégrations Illustrator I2 et I7, les tests et les fonctions aval absentes.
+- [10-ILLUSTRATOR-30-6.md](10-ILLUSTRATOR-30-6.md) : la liste I1 à I8 dictée, chaque
+  sous-fonction comparée au code et l'audit détaillé de la Plume publiée.
+
+## Décision proposée
+
+Le prochain cycle doit traiter P0 puis P1 du backlog, réparer notamment l'appartenance de page, le
+connecteur Miro, la Plume et le contrat d'actif I7, puis fermer le premier carrousel composé en
+plusieurs PNG vérifiés, avec statut persistant et présence dans la galerie. Toute extension
+Illustrator attend cette preuve. InDesign reste hors de cette photographie datée.

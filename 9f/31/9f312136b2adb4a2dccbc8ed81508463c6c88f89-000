@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>{{title}}</title>
+<style>
+body{margin:0;background:#0b0d12;color:#fff;font-family:'AnthropicSans',system-ui,sans-serif}
+.wrap{padding:48px 56px;max-width:900px}
+h1{font-size:44px;font-weight:500;letter-spacing:-.02em;margin:0 0 10px;text-transform:uppercase}
+.band{background:#d9232e;display:inline-block;padding:6px 14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase}
+.beat{border-left:3px solid #d9232e;padding-left:16px;margin:22px 0;max-width:62ch}
+.role{font-family:'AnthropicMono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.6}
+</style></head>
+<body><div class="wrap">
+<span class="band">Direct</span>
+<h1>{{title}}</h1>
+<p>{{message}}</p>
+{{#beats}}<section class="beat"><span class="role">{{number}} · {{roleLabel}}</span><p>{{text}}</p></section>{{/beats}}
+{{^beats}}<p>Aucun beat.</p>{{/beats}}
+</div></body></html>

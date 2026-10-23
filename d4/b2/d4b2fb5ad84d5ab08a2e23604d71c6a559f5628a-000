@@ -1,0 +1,342 @@
+# Audit UX et UI orienté résultat
+
+## Le résultat avant l'outil
+
+L'interface reprend correctement le mobilier d'un éditeur professionnel : outils en haut, palette,
+hiérarchie, canevas, détails, bibliothèque et barre d'état. Ce choix rend la composition familière,
+mais il place l'utilisateur directement au milieu de la machine. La vision II demande autre chose
+en amont et en aval : choisir ce qu'il veut produire, puis retrouver ce qu'il a livré.
+
+Le produit doit donc organiser cinq moments :
+
+1. **Choisir une intention** : post, carrousel, article, story, présentation ou plan ;
+2. **Composer** : page, objets, composants et actifs ;
+3. **Décliner** : variantes par destination et format ;
+4. **Contrôler et livrer** : fichiers, erreurs, légende et remise ;
+5. **Retrouver** : galerie, état, version et réutilisation.
+
+L'éditeur actuel couvre surtout le deuxième moment.
+
+## Frictions observées dans le code
+
+Sans inspection navigateur, le code révèle déjà les frictions suivantes :
+
+- deux types d'objet, pièces Lego et calques, partagent le canevas sans partager tous les gestes ;
+- la bibliothèque ajoute une pièce Lego, tandis que la palette ajoute un calque composant ;
+- les diapositives apparaissent comme une liste textuelle, sans vignette ni aperçu de lot ;
+- changer de diapositive ne nettoie pas la sélection ; Détails peut donc continuer à modifier un
+  objet devenu invisible et permettre une relation entre deux pages ;
+- la barre d'état compte les pièces Lego mais pas tous les calques ;
+- son texte de sélection ignore un calque sélectionné ;
+- la présence d'un chemin ressemble à un état enregistré, même après modification ;
+- la sélection rectangulaire et les guides peuvent considérer des objets invisibles ;
+- « cadrer la sélection » depuis le menu contextuel peut cadrer l'ancienne sélection, car le callback
+  lit l'état précédent ;
+- les menus du haut se ferment au départ de la souris, geste fragile au clavier et au tactile ;
+- beaucoup d'icônes n'ont qu'un `title`, les lignes de hiérarchie sont des `div` cliquables et les
+  cibles mesurent souvent moins que la taille tactile recommandée ;
+- l'édition de texte en place montre une textarea qui ne possède pas exactement la typographie du
+  calque ;
+- le seul breakpoint mobile se situe à 520 px, alors que la structure à plusieurs colonnes demande
+  une décision bien avant ;
+- les commandes d'enregistrement, d'export et de publication ne matérialisent pas trois états
+  distincts du travail ;
+- le chemin Create, le SHA et le reçu publié restent visibles après un changement de projet ; le
+  raccourci d'enregistrement peut donc viser silencieusement le document précédent ;
+- changer de projet ne restaure pas son thème ou son format et ne vide pas la sélection, son ancre,
+  le sous-nœud ni le verrou de l'inspecteur, de sorte que le titre peut désigner B tandis que
+  l'interface conserve encore plusieurs éléments de contexte de A ;
+- le navigateur Create transforme une erreur réseau en dossier vide, ne prévient pas avant un nom
+  déjà pris et les suppressions de projet ne possèdent pas de confirmation ni corbeille visible ;
+- ce navigateur reste monté en permanence dans l'onglet Fichiers : Annuler passe seulement
+  `browser` à `null`, ce qui revient au mode Enregistrer sans fermer la surface ; son dossier et son
+  nom sont initialisés une fois, puis ne suivent plus le projet, le chemin ou les nouvelles props ;
+- « Supprimer le document » retire seulement le projet du store local, sans supprimer le fichier
+  `.zmedia.json` déjà enregistré dans Create, distinction que le libellé ne révèle pas ;
+- coller retire toujours `groupId` sans rattacher les nouveaux calques à la page active ; la copie
+  devient donc un masque visible sur toutes les diapositives, quel que soit le lieu du collage ;
+- le connecteur créé entre deux objets d'une diapositive devient un masque global, visible sur les
+  autres pages ; sa boîte rectangulaire peut masquer le contenu et devient une forme pleine dès
+  qu'une extrémité est supprimée ;
+- les groupes qui servent de diapositives offrent aussi Dissoudre, Supprimer, Auto Layout et les
+  raccourcis de groupement ordinaires ; une commande apparemment locale peut donc faire sortir les
+  objets de leur page ou invalider la diapositive entière ;
+- le rectangle avec Maj ou Commande annonce une addition, mais remplace la sélection à chaque
+  mouvement et inclut les objets masqués ou d'autres diapositives ;
+- le verrou d'un groupe bloque le mouvement sans retirer les poignées ni l'édition de texte, tandis
+  que le verrou du Cut ne bloque que son réajustement automatique ;
+- fusionner deux blocs peut supprimer sans avertissement les images au-delà du quatrième slot ;
+- une page qui a été réduite pour tenir peut rester réduite après simplification du contenu ou
+  changement de diapositive, puis imposer son échelle à tout l'export multi-page ;
+- les opérations asynchrones d'enregistrement, d'ouverture, de publication et de certains actifs
+  ne possèdent pas toutes un `finally` : si une dépendance lève malgré son contrat, l'indicateur
+  occupé peut rester affiché jusqu'au rechargement ;
+- lors d'un changement de thème, l'ancien thème reste en mémoire pendant le chargement du nouveau ;
+  si le document ouvert ne possède pas encore de Cut, son premier contenu peut donc être monté
+  avec les règles du thème précédent, sans que l'utilisateur voie la course qui vient de figer ce
+  mauvais résultat ;
+- la Plume publiée se cache dans l'onglet Bibliothèque plutôt que dans la barre
+  persistante des outils ; si l'utilisateur quitte cet onglet, rien près du canevas ne montre que
+  son prochain clic crée un point au lieu de sélectionner ;
+- désactiver la Plume par son bouton ne vide pas son brouillon : le tracé pointillé peut rester
+  visible alors que le clic vide recommence une sélection rectangulaire ;
+- un tracé reste présenté comme une forme générique : Détails propose « Type de forme », bien que
+  Rectangle, Ellipse ou Étoile n'aient aucun effet sur son chemin ;
+- le même panneau laisse choisir Dégradé, mais le compilateur désactive ce remplissage pour les
+  tracés et conserve un fond uni, sans expliquer que la commande est sans effet ;
+- les ancres et poignées de tracé sont des éléments pointeur sans rôle, nom, focus ni alternative
+  clavier, et leur calcul de geste ignore la rotation et le retournement visibles ;
+- les tests d'interface de la Plume passent malgré un avertissement de coordonnée `NaN`, ce qui
+  laisse précisément le raccord entre événement, zoom et géométrie sans preuve ;
+- la note du canevas affiche le nom d'une pièce Lego seulement : sélectionner un calque ou un tracé
+  laisse encore « Sélection : aucune », contradiction visible avec la boîte active ;
+- I7 incorpore certaines images seulement au moment de l'export, sans état Liée ou Incorporée dans
+  le document ; l'utilisateur ne sait donc ni ce qui sera embarqué ni ce qui restera dépendant du
+  réseau ;
+- un refus CORS laisse silencieusement l'URL dans le livrable et une requête lente n'a ni délai
+  maximal, ni progression, ni annulation : l'écran peut annoncer une sortie autonome incomplète ou
+  rester occupé sans cause visible.
+
+Ces défauts partagent une cause : l'interface affiche les structures techniques disponibles, alors
+qu'elle devrait afficher l'objet que l'utilisateur essaie d'obtenir.
+
+## Architecture d'information cible
+
+### Galerie
+
+La page d'entrée montre des publications, non un écran vide d'éditeur. Les vues minimales sont :
+
+- Brouillons ;
+- À corriger ;
+- Prêts ;
+- Exportés ;
+- Publiés ;
+- Modèles.
+
+Chaque carte affiche la miniature réelle, le type, la destination, le nombre de pages, le dernier
+état, la date et une action principale. Une recherche couvre titre, texte, thème, actif et
+destination. « Dupliquer comme modèle » transforme un résultat passé en point de départ.
+
+### Nouveau média
+
+Un sélecteur compact demande le résultat, pas le logiciel à imiter :
+
+- Post Instagram ;
+- Carrousel Instagram ;
+- Post LinkedIn ;
+- Article ;
+- Story ou Reel ;
+- Présentation ;
+- Plan libre.
+
+Chaque intention fixe un profil de sortie, suggère les formats et ouvre une page ou un template.
+L'utilisateur peut toujours partir d'un document vide, mais il ne doit pas configurer format,
+nombre de pages et destination avant d'avoir vu un canevas.
+
+### Éditeur
+
+L'écran garde le langage visuel actuel, avec quatre zones stables :
+
+1. pages et masques à gauche, avec vraies vignettes ;
+2. canevas au centre ;
+3. inspecteur contextuel à droite ;
+4. tiroir recherchable pour composants, thèmes et actifs.
+
+Les outils rares quittent la surface permanente et rejoignent la palette de commandes. Le panneau
+Détails ne montre que les propriétés valides pour la sélection. Une sélection multiple commence
+par alignement, distribution, visibilité et style commun, non par des champs vides.
+
+La page, le groupe et le masque doivent porter des icônes et des commandes distinctes. Un groupe de
+page n'offre jamais Dissoudre ou Supprimer depuis la pile des calques ; sa suppression passe par la
+vignette de page, avec confirmation si elle contient du travail. Un connecteur se crée seulement
+entre deux objets de la page active, reste sélectionnable près du trait et affiche un état cassé
+explicite lorsqu'une extrémité manque, au lieu de devenir une forme pleine.
+
+Deux actions restent toujours visibles : **Créer les variantes** et **Livrer**. En présence d'un
+blocage, Livrer ouvre le problème précis et propose l'action qui le résout.
+
+### Variantes
+
+Après composition de la source, une vue compare les sorties retenues : carré Instagram, portrait,
+story, LinkedIn, aperçu web, etc. Chaque carte indique :
+
+- état Prêt ou nombre de blocages ;
+- miniature de toutes les pages ;
+- différences locales ;
+- taille de fichier estimée ou mesurée ;
+- dernière génération.
+
+Un clic ouvre l'override de cette variante, sans déplacer les objets de la source. « Réinitialiser »
+supprime seulement ses overrides.
+
+### Livraison
+
+La livraison rassemble dans un seul écran : destination, compte, pages, ordre, légende, texte
+alternatif, contrôles, date et action. Si aucune API n'est branchée, l'action s'appelle
+**Préparer le paquet**. Si un adaptateur fonctionne, elle s'appelle **Publier** ou **Programmer**.
+
+Le résultat montre un reçu persistant. Fermer l'écran ne perd ni l'erreur ni le chemin des fichiers.
+
+## Parcours et budgets de clics
+
+| Intention | Point de départ | Budget cible | Résultat vérifiable |
+|---|---|---:|---|
+| Publier un brouillon prêt | Carte de galerie | 3 actions au plus | reçu ou paquet ouvert, statut conservé |
+| Créer un carrousel depuis un modèle | Galerie | 5 actions avant première exportation, hors saisie du contenu | lot ordonné de PNG et manifeste |
+| Ajouter une page | Éditeur | 1 | page visible, nommée et active |
+| Insérer un composant connu | Canevas ou tiroir | 2 au plus | composant posé sur la page active et sélectionné |
+| Remplacer une image | Sélection d'image | 2 au plus | même cadre, nouvel actif, provenance conservée |
+| Corriger un blocage | Carte de variante ou Livraison | 1 pour atteindre le bon réglage | règle repasse au vert après nouvelle mesure |
+| Changer de page | Éditeur | 1 | canevas, hiérarchie et sélection reflètent la page |
+| Décliner en deux formats | Éditeur | 2 | deux variantes existent sans mutation de la source |
+
+Le compteur d'actions actuel incrémente des événements internes et parfois deux fois un même
+geste ; il ne mesure donc pas ces parcours. La télémétrie utile compte les intentions nommées et le
+temps jusqu'au premier livrable, sans enregistrer le contenu privé.
+
+## États visibles
+
+La barre d'état doit répondre en permanence à cinq questions :
+
+- où suis-je : page et variante ;
+- qu'ai-je sélectionné : type, nom et nombre ;
+- mon travail est-il enregistré : propre, modifié, sauvegarde en cours, conflit ;
+- puis-je livrer : prêt ou nombre de blocages ;
+- quelle action s'exécute : rendu, export, publication, erreur ou reprise.
+
+Les états recommandés possèdent un texte et une icône, jamais une couleur seule. Un échec reste
+visible jusqu'à résolution ou acquittement ; un toast éphémère ne suffit pas pour une perte
+d'export.
+
+L'identité affichée doit être atomique : changer de projet met à jour en un seul geste sa
+sélection, son document Create, sa révision, son thème, son format, son état sale et sa publication.
+Tant que ce contrat n'existe pas, le titre seul ne suffit pas à garantir à l'utilisateur qu'il
+enregistre le bon objet.
+
+## Manipulation directe
+
+Le même ensemble d'objets doit alimenter canevas, hiérarchie, snapping, marquee, compteur et
+export. Une couche masquée, verrouillée par son groupe ou située sur une autre page disparaît de
+toutes les interactions qui ne la concernent pas.
+
+Un geste continu suit ce cycle :
+
+1. le pointeur capture l'objet et son état initial ;
+2. la prévisualisation bouge sans enregistrer ;
+3. les guides ne lisent que les cibles visibles de la page ;
+4. le relâchement valide une transaction ;
+5. Échap annule le geste courant ;
+6. Annuler revient en une seule fois à l'état initial.
+
+Pour une sélection groupée, la boîte englobante devient l'objet temporaire. Les poignées, le
+verrou, l'alignement et le menu contextuel reflètent l'état effectif du groupe.
+
+Un outil modal comme la Plume doit rester visible près du canevas tant qu'il capture les clics :
+icône active dans la barre, curseur cohérent, nombre de points, action Terminer et action Annuler.
+L'inspecteur masque alors les propriétés sans effet et expose seulement chemin, fond, contour et
+transformation. Une ancre reçoit un vrai bouton ou une cible ARIA, un focus et des commandes
+clavier ; le calcul du pointeur utilise la matrice inverse exacte du rendu.
+
+La sélection rectangulaire conserve au `pointerdown` les identifiants déjà choisis et le mode du
+geste, puis calcule au mouvement union, soustraction ou remplacement. Elle filtre la page active,
+la visibilité effective et le verrou avant de déterminer l'objet principal. Sans cet instantané,
+le commentaire « ajoute à la sélection » et le résultat divergent.
+
+## Composants et actifs
+
+Le tiroir unifie les deux voies actuelles. Un composant posé devient toujours un nœud de scène sur
+la page active ; le moteur peut migrer l'ancienne pièce Lego en interne, sans exposer ce vocabulaire
+à l'utilisateur.
+
+Chaque carte de composant montre une vignette, son thème, son type, les propriétés modifiables et
+sa compatibilité de format. Chaque actif montre format, dimensions, poids, provenance, licence et
+derniers usages. Les favoris et récents réduisent davantage les clics qu'une nouvelle taxonomie.
+
+Le régime de l'actif reste visible sur sa carte et dans l'inspecteur : **Lié**, **Incorporé**,
+**Manquant**, **Modifié** ou **Interdit à la publication**. Passer de Lié à Incorporé est une
+commande réversible du document, non un effet caché de l'export. Livrer liste les ressources qui
+restent externes et refuse le mot « autonome » tant qu'une seule dépendance subsiste.
+
+L'inspecteur traduit le schéma au lieu d'afficher tout comme une chaîne : checkbox pour booléen,
+liste fermée pour choix, nombre normalisé, couleur valide, valeur héritée visible et erreur de
+schéma explicite. Le même inspecteur sert une pièce historique et un calque composant. Lorsqu'une
+source change, il présente les propriétés conservées, migrées ou orphelines avant validation.
+
+Le remplacement conserve la géométrie et les overrides compatibles. Si un composant change de
+version, l'interface montre les propriétés perdues au lieu de les effacer silencieusement.
+
+## Accessibilité
+
+Le CSS actuel emploie de nombreux textes entre 8,5 et 10 px, des contrôles de 17 à 28 px, des
+actions visibles seulement au survol et des champs dont l'outline est supprimé. Ce choix rend
+l'éditeur dense, mais il exclut le clavier, le tactile et une partie des utilisateurs à basse
+vision.
+
+Le contrat minimal est le suivant :
+
+- cible interactive de 40 px au moins, ou espacement équivalent sur interface desktop dense ;
+- corps fonctionnel de 12 px minimum, 14 px pour les longues valeurs ;
+- `focus-visible` contrasté sur chaque action ;
+- boutons et éléments d'arbre sémantiques avec nom accessible ;
+- modèle ARIA `tree`, `treeitem`, `menu`, `menuitem` et `dialog` là où il s'applique ;
+- toutes les opérations essentielles possibles au clavier ;
+- aucune commande disponible seulement au survol ;
+- contraste vérifié sur les thèmes clair, sombre et contraste forcé ;
+- respect de `prefers-reduced-motion` dans l'éditeur et le média exporté ;
+- annonces discrètes pour sauvegarde, export et erreur ;
+- zoom navigateur à 200 % sans disparition d'action.
+
+Le shell applique déjà une durée presque nulle sous `prefers-reduced-motion: reduce`, mais cette
+règle ne traverse pas l'iframe `srcDoc`. Les nouvelles animations de calque y vivent en style
+inline ; elles doivent lire leur propre media query ou être désactivées par le compilateur lorsque
+la préférence système le demande.
+
+Le Critique doit aussi vérifier la production : langue du document, texte alternatif, ordre de
+lecture HTML, contraste réel et présence des glyphes. Comme le japonais fait partie des usages de
+Matthieu, une fixture mêlant français, latin accentué, kana et kanji doit vérifier les polices et le
+retour à la ligne.
+
+## Responsive et mobile
+
+Un éditeur complet de ce type ne devient pas agréable sur téléphone en comprimant ses trois
+colonnes. Le produit doit déclarer deux modes :
+
+- **desktop et tablette large** : composition complète ;
+- **mobile** : galerie, revue, commentaires, légende, validation et publication, avec édition
+  légère du texte et remplacement d'image.
+
+Si la composition mobile complète n'est pas un objectif, l'interface le dit et propose d'ouvrir le
+projet sur desktop. Cette décision vaut mieux qu'un breakpoint qui conserve des contrôles trop
+petits et des panneaux hors écran.
+
+Le CSS actuel ne réalise pas encore même cet empilement de secours. À 520 px, il remplace les trois
+colonnes par une seule sans redéfinir les `grid-template-areas`, qui continuent de décrire trois
+cellules par ligne et peuvent créer des colonnes implicites. Il impose en outre `min-height:260px`
+à chaque panneau, y compris aux zones Menu, Outils et Statut. Le commentaire parle d'un seuil sous
+800 px, tandis que la règle emploie 520 px. Le futur mode responsive doit donc déclarer ses zones,
+leur ordre et les actions autorisées, non seulement réduire le nombre de colonnes.
+
+## Direction visuelle
+
+L'agrément ne demande pas davantage de chrome. Il demande une hiérarchie calme : canevas dominant,
+panneaux secondaires plus silencieux, actions de livraison toujours lisibles, valeurs regroupées
+par intention et espace suffisant autour des cibles. Les icônes restent utiles lorsqu'elles
+accompagnent un nom ou possèdent un sens établi ; elles ne doivent pas cacher les verbes rares.
+
+Trois densités peuvent suffire : compacte pour la hiérarchie, confortable pour Détails, immersive
+pour le canevas. Leur mesure se conserve par utilisateur. Le thème de l'éditeur reste neutre afin
+de ne pas fausser la perception du média.
+
+## Tests d'usage obligatoires
+
+Avant de déclarer la refonte réussie, cinq essais enregistrés doivent être accomplis sans aide :
+
+1. créer un carrousel de trois pages depuis un modèle ;
+2. remplacer une photo et corriger son cadrage ;
+3. adapter le même projet à Instagram carré et LinkedIn paysage ;
+4. résoudre un texte hors zone puis produire le paquet ;
+5. rouvrir le projet, vérifier son statut et retrouver la publication.
+
+Pour chaque essai, on mesure actions, temps, retours arrière, erreurs, demandes d'aide et différence
+entre résultat attendu et résultat livré. La cible n'est pas que l'utilisateur reconnaisse les
+outils empruntés aux six logiciels ; elle est qu'il obtienne son média sans devoir y penser.

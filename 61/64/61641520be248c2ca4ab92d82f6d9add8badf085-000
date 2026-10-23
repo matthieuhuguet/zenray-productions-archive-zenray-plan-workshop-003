@@ -1,0 +1,131 @@
+# Attaque de faisabilité des documents 05, 06 et 07
+
+Angle unique : ce qui ne peut pas marcher avec le modèle de données et le code d'aujourd'hui. Pour chaque point, le défaut, la preuve lue, le changement de contrat exigé, ce que cela casse dans les tests, et si C1 doit passer d'abord.
+
+## Ce que j'ai lu, et l'état mesuré du dépôt
+
+Lus en entier : `src/zenraymedia/composition.js` (156 lignes), `document.js` (148), `compile.js` (352), `contracts.js` (187), `htmlTemplate.js` (117), `formats.js` (105), `forge.js` (133), `componentCatalog.js` (55), `composition.test.js`, `document.test.js`, `docs/zenraymedia/KANBAN.md`. Lus par extraits ciblés : `critic.js` L1 à L60 et L100 à L253, `MediaApp.jsx` L40 à L280 et L580 à L880, `media.css` L1 à L30 et L190 à L270, `exporters.js` L100 à L160, `themes/registry.js` L1 à L180, `scripts/zrm-build-theme.mjs` L52 à L70, L180 à L215 et L355 à L375, `src/config/colors.js` L20 à L50, `themes/T-04-1-1--revelation-cinematique/parts/01-title-screen.html` L1 à L20.
+
+Suite de tests exécutée de ma main, `npx vitest run src/zenraymedia` : six fichiers, **126 tests, tous verts**, en 5,68 s. Le chiffre du KANBAN est donc exact. Ce qu'il ne dit pas, c'est la répartition : `zenraymedia.test.js` 81, `MediaApp.test.jsx` 21, `document.test.js` 14, `themes.test.js` 6, `composition.test.js` 3, `componentCatalog.test.js` 1.
+
+---
+
+## 1. La voie Lego n'a aucun test, et le fichier que le KANBAN cite comme preuve n'existe pas
+
+Le défaut est de méthode avant d'être de code, et c'est pour cela qu'il vient en premier : les trois documents empilent des engagements sur `composedPage()`, or aucune ligne de cette fonction n'est couverte. J'ai cherché `composition`, `Lego`, `componentBundle` et `data-zrm-instance` dans les six fichiers de test : les seules occurrences sont `MediaApp.test.jsx` L241, L247 et L251, qui comptent des éléments dans le panneau de structure et ne compilent rien. `composition.test.js` ne fait que trois cas, tous sur le modèle plat, jamais sur le rendu.
+
+Pire, le KANBAN écrit ligne 16 que la reproductibilité est « vérifié par le test `compile.test.js` ». Ce fichier n'existe nulle part dans le dépôt, `find . -name compile.test.js` ne rend rien. Le test réel est `zenraymedia.test.js` L150, et il compile la voie à tokens, pas la voie Lego.
+
+Changement de contrat exigé : aucun, c'est du travail de garde. Ce que cela casse : rien, par construction. Faut-il C1 d'abord : non, l'inverse. Un test qui compile une composition de deux instances du même composant est précisément le critère de fini que C1 réclame ligne 56, et il doit exister **avant** qu'on touche à `compile.js` L221, sinon la carte se déclare finie sans preuve.
+
+---
+
+## 2. La page Lego ne borne pas le canevas, donc cinq formats sur sept mentent
+
+`composedPage()` produit sa propre feuille, `compile.js` L237 à L256, et l'on y cherche en vain ce que la voie à tokens pose en L126 et L136 à L140 : le `width` et le `height` du canevas sur `body`, l'`overflow:hidden`, la boîte `.zrm-frame` qui porte les zones de sécurité. Tout ce que la page Lego connaît du format, c'est `max-width:1180px` ou `none` et `min-height:100vh` selon que `format.canvas.h` est nul (L244). Un carré 1080, un 9:16, un A4, une vidéo 16:9 rendent donc une colonne qui coule, sans marge de sécurité, sans plafond de hauteur, et sans le facteur `density` que `themeCss` applique en L95 à toute valeur typographique.
+
+Conséquence directe pour le document 07 : les six formats déclarés ne sont pas servis, ils sont ignorés. Conséquence pour le document 05 : la carte C6, les zones de sécurité, n'a rien à dessiner sur la voie qui compte. Le calque `zrm-safe-overlay` de `MediaApp.jsx` L866 continue de s'afficher par-dessus, ce qui est le cas le plus coûteux, un repère qui donne une garantie fausse.
+
+Changement de contrat exigé : `composedPage` reçoit et applique `format` comme `themeCss` le fait, ce qui suppose de décider si `density` multiplie aussi les tokens d'un thème de composants, question que les documents n'abordent pas. Ce que cela casse : aucun test existant, voir le point 1, ce qui est justement le problème. Faut-il C1 d'abord : non, et c'est même l'argument le plus fort pour traiter ce point tôt, puisque le panneau Détails de C1 exposera des largeurs et des ratios qui n'auront aucun sens tant que le cadre de sortie n'existe pas.
+
+---
+
+## 3. Le Critique mesuré est aveugle à la voie Lego, et sa boucle d'ajustement ne s'accroche jamais
+
+`inspectRendered` cherche `.zrm-page` puis retombe sur `doc.body` (`critic.js` L187), balaie `.zrm-title, .zrm-beat-text, .zrm-standfirst, .zrm-byline, .zrm-kicker` pour les zones de sécurité (L214), et `.zrm-beat-text, .zrm-standfirst` pour le plancher de lisibilité (L226) comme pour la veuve (L235). Aucun de ces sélecteurs n'existe dans une page composée, qui n'émet que `.zrm-lego-page`, `.zrm-lego-row`, `.zrm-lego-item` et `.zrm-lego-image` (L229, L244 à L248). Sur une composition, le Critique mesuré rend donc, dans le meilleur des cas, un seul contrôle de débordement pris sur le `body`, et zéro contrôle de sécurité, de taille de texte ou de composition.
+
+L'effet en cascade est plus grave que la perte des contrôles. `onFrameLoad` (`MediaApp.jsx` L241 à L266) ne descend d'un palier d'échelle que si `found` contient `overflow.vertical`, `overflow.horizontal`, `safe.top` ou `safe.bottom` : sur une page Lego ces codes ne sortent quasiment jamais, donc l'ajustement mesuré, qui est la réparation du 2026-07-25, est mort sur la voie Lego.
+
+Et le Critique statique, lui, parle quand même, mais d'autre chose : `critic.js` L133 à L137 annonce « ce format montre 1 bloc sur 5 » en s'appuyant sur `visibleBeats`, alors que la page composée n'affiche aucun beat. Le verdict décrit un rendu qui n'a pas eu lieu.
+
+Changement de contrat exigé : `inspectRendered` prend la source du rendu, `compile()` la connaît déjà et la met dans `meta.source` (L305, valeur `'composition'`), et branche deux jeux de sélecteurs. Ce que cela casse : `zenraymedia.test.js` L445, « valide le projet de démonstration sans défaut bloquant », et L272, « le Critique annonce les blocs réservés aux formats de lecture », deviennent sensibles à toute modification de `fit.omitted`. Faut-il C1 d'abord : non. Le document 05, section 8, et le document 06, section 5, promettent tous deux d'enrichir le Critique ; ils enrichissent un poste qui ne regarde pas la bonne page.
+
+---
+
+## 4. La fusion `{ ...data, ...item.props }` telle qu'écrite dans C1 efface le brief au lieu de le compléter
+
+Le KANBAN L52 pose la fusion sous cette forme exacte, et les documents 05 et 07 la reprennent. Or `lookup()` (`htmlTemplate.js` L20 à L28) rend la chaîne vide pour toute valeur nulle, et l'étalement d'objet ne distingue pas une clef absente d'une clef présente valant `''`. Dès qu'un champ éditable a été touché puis vidé, `item.props.title` vaut `''`, l'étalement gagne sur `data.title`, et le composant cesse d'afficher le titre du brief au lieu d'y revenir. Le modèle aggrave le cas : `normalizeComposition` pose `props: {}` par défaut (`composition.js` L28), donc la distinction entre « jamais renseigné » et « renseigné puis vidé » n'existe nulle part.
+
+Second défaut, sur la même ligne du KANBAN. Le `default` proposé vaut `"{{title}}"`, mais `renderScope` est à passe unique et volontairement ainsi, commentaire de `htmlTemplate.js` L30 à L37 : une valeur substituée n'est jamais réinterprétée, `out += escapeHtml(value)` en L97 est terminal. Un défaut de gabarit sort donc littéralement, accolades comprises et échappées. Le document 05 signale cette réserve sans en tirer la conséquence : le défaut doit être résolu **avant** la fusion, contre `data`, en une passe séparée.
+
+Changement de contrat exigé : la fusion devient une fonction nommée qui ne retient que les clefs de `props` dont la valeur est une chaîne non vide, et qui résout d'abord les `default` déclarés par `renderTemplate(default, data)`. Ce que cela casse : rien aujourd'hui, `zenraymedia.test.js` L314 à L333 ne teste que le moteur nu. Faut-il C1 d'abord : c'est C1, et c'est sa spécification qui est fautive, pas son ordre.
+
+---
+
+## 5. Le champ `timeline` du document 06 est détruit à chaque geste, pas seulement au rechargement
+
+Le document 06 écrit que `timeline` « serait perdu » et parle de trois lignes à ajouter. La lecture de `composition.js` L17 à L33 dit plus que cela : `normalizeComposition` retourne un littéral à quatre clefs, et il est appelé en tête de `insertItem` (L89), `addComponent` (L104), `addImage` (L110), `removeItem` (L116), `moveItem` (L127), `patchItem` (L135), `duplicateItem` (L146), plus `MediaApp.jsx` L181 au montage et L186 dans `patchComposition`. La timeline ne survivrait donc pas à un simple déplacement d'élément, en mémoire, sans qu'aucun rechargement soit en cause. Le symptôme serait exactement celui que le document 06 redoute, mais dix fois plus fréquent.
+
+Le même mécanisme frappe une idée du document 05 que personne n'a signalée : le « palier intermédiaire bon marché » consistant à donner des propriétés de disposition à la ligne. La ligne est reconstruite en `{ id, items }` (L23 à L24), toute clef posée dessus disparaît au premier geste. UniformGrid au palier ligne, présenté comme réalisable sans C7 dans le tableau des huit conteneurs, n'est donc pas réalisable sans toucher `normalizeComposition`.
+
+Changement de contrat exigé : conserver l'inconnu au lieu de le reconstruire, soit `{ ...value, v, themeId, serial, rows }` pour la composition et `{ ...row, id, items }` pour la ligne. C'est une inversion de doctrine, la fonction est aujourd'hui délibérément restrictive au niveau composition et permissive au niveau item (L25 à L30). Ce que cela casse : `document.test.js` L60 à L74 passe encore, il n'assert que ce qui est présent ; `composition.test.js` reste vert. Aucun test ne garde le comportement restrictif, ce qui veut dire qu'aucun test ne remarquera non plus si la permissivité laisse entrer une clef corrompue. Il faut donc ajouter le test dans les deux sens. Faut-il C1 d'abord : non, mais ouvrir ce contrat deux fois, une pour C1 et une pour C8, est un coût inutile ; l'ouvrir une seule fois, au moment de C1, est le bon appel.
+
+---
+
+## 6. La Forge tire sa durée du cut, jamais d'une timeline, donc la section 2 du document 06 n'a aucun chemin vers un fichier
+
+`durationOf(cut, format)` somme les durées de beats et les borne (`formats.js` L91 à L96), `forgePlan` s'en sert pour calculer `frames` (`forge.js` L101 à L103), et `renderScript` fige ce nombre dans le script généré (L45 à L49, `const FRAMES = ${frames}`). Une composition Lego n'entre nulle part dans ce calcul. Un document composé de vingt pièces animées sur trois secondes, mais dont le cut porte deux beats calmes, rendra le nombre d'images du cut, et la sortie sera tronquée ou étirée sans qu'aucune erreur ne le dise.
+
+Accessoirement, `MediaApp.jsx` L322 conditionne le plan à `cut` non nul, donc un document purement composé n'a pas de plan de Forge du tout.
+
+Changement de contrat exigé : `durationOf` prend une troisième source, ou `forgePlan` reçoit la durée déjà calculée par l'appelant. Ce que cela casse : `zenraymedia.test.js` L126, « borne la durée aux limites du format », et L136, « la durée d'un beat dépend du tempo et du poids » ; tous deux appellent `durationOf(cut, format)` avec deux arguments, donc une signature élargie par un paramètre optionnel les laisse verts. Faut-il C1 d'abord : oui, et le document 06 le dit lui-même en plaçant C8 après C1, mais pour une raison plus faible que celle-ci.
+
+---
+
+## 7. Un thème de forme 3 n'a droit qu'à un format dans le catalogue, ce qui contredit la section 1 du document 07
+
+Le document 07 déclare six formats pour `T-09-1-1`. Or `entriesFromHtml()` écrit `formats: ['F-web-article']` en dur (`themes/registry.js` L66), et c'est cette entrée que `listThemes()` publie. La déclaration `formats` de l'en-tête `<!--zr-theme …-->` n'est lue qu'après chargement du fichier, en L163, et n'écrase que l'objet thème, pas l'entrée de catalogue. La conséquence est donc double et il faut la dire précisément : le Critique, qui lit `theme.formats` en `critic.js` L107, verra bien les six formats et ne se plaindra pas ; mais le sélecteur de thèmes et le filtre par format servi de la carte C5 verront un thème web uniquement, puisqu'ils lisent l'entrée.
+
+Le garde-fou du script de génération ajoute une contrainte que le document 07 ne mentionne pas du tout : `scripts/zrm-build-theme.mjs` refuse le thème si le gabarit assemblé ne contient pas `{{#beats}}` (« il serait muet ») ni `{{title}}`, aux deux lignes qui suivent la vérification des ressources distantes. Un client de streaming fait de quarante-sept parts doit donc héberger, dans au moins une part montée en page, une boucle sur les beats éditoriaux, sans quoi le thème ne se construit pas.
+
+Changement de contrat exigé : soit `entriesFromHtml` lit l'en-tête au listing, ce que l'architecture refuse explicitement pour tenir à 1024 thèmes (commentaire L12 à L16), soit le nom de fichier porte les formats, soit l'entrée gagne un champ `formats` alimenté paresseusement au premier chargement. Ce que cela casse : `zenraymedia.test.js` L339 assert `readThemeHeader(good).formats` et reste vert quoi qu'il arrive, il teste le lecteur d'en-tête, pas le catalogue. Faut-il C1 d'abord : non, mais ce point appartient à C5 et non à C1.
+
+---
+
+## 8. La déclaration `props` n'a pas besoin du script de génération, et le document 07 se trompe de blocage
+
+Le document 07 tient pour bloquant que `zrm-build-theme.mjs` ne recopie que sept clefs dans le registre. La lecture confirme les sept clefs, `id`, `name`, `group`, `role`, `reference`, `file`, `standalone`, aux lignes 195 à 203. Mais elle infirme la conclusion. `componentCatalog.js` L41 à L43 charge le **fichier de part brut** à l'exécution, `parts[key]()` en `?raw`, et le pose dans `entry.html`. L'en-tête `<!--zrm { … } -->` est donc physiquement présent en mémoire dans l'application, c'est `splitPart` qui le jette au dernier moment, `compile.js` L197. La déclaration `props` peut donc être lue à l'exécution, avec la même expression régulière que le script de génération emploie en L58, sans modifier le script ni régénérer un seul registre.
+
+C'est une correction qui allège C1 au lieu de l'alourdir, et c'est la seule bonne nouvelle de ce document. Changement de contrat exigé : aucun, une fonction de lecture d'en-tête dans `componentCatalog.js`. Ce que cela casse : rien, `componentCatalog.test.js` ne contient qu'un seul test.
+
+---
+
+## 9. « Le zoom manuel n'écrit que dans `fitScale` » n'est pas réalisable, `fitScale` n'est pas inscriptible
+
+L'engagement final du document 05 est formulé contre le code. `fitScale` n'est pas un état du composant : c'est la valeur rendue par le hook, `const { scale: fitScale, availH } = useFitScale(stageRef, format.canvas.w, format.canvas.h)` en `MediaApp.jsx` L270. À l'intérieur du hook, `setFit` est appelé par `measure()`, lui-même branché sur un `ResizeObserver` (L64 à L67). Rien à l'extérieur ne peut lui écrire, et le premier redimensionnement du panneau écraserait de toute façon une valeur imposée.
+
+Un zoom manuel exige donc une troisième valeur, distincte de `fitScale` et de `contentScale`, ce qui est exactement la confusion que le commentaire L107 à L111 dit avoir été attrapée par le build. L'engagement doit être réécrit avant d'être tenu : le zoom manuel écrit dans un facteur d'affichage propre, que le rendu multiplie par `fitScale`, et jamais dans `contentScale`.
+
+Dans le même paragraphe, une seconde erreur de sens. Le document 05 demande que le dépôt dans l'aperçu « appelle `placementAt` sans la modifier et multiplie les coordonnées par `fitScale` ». Or `placementAt` (L594 à L601) normalise déjà par la boîte de sa cible, `(event.clientX - box.left) / box.width`, et rend un ratio. Elle est invariante à l'échelle par construction. Multiplier par `fitScale` introduirait précisément l'erreur que la fonction évite. Changement de contrat exigé : aucun, l'engagement se corrige à la rédaction.
+
+---
+
+## 10. Le repli à deux panneaux n'existe qu'à moitié, l'activer casserait la grille
+
+Le document 05 ouvre sur une mesure et en tire que « les deux replis existent déjà en CSS et ne servent jamais ». Les deux règles existent bien, `media.css` L21 et L22, et `MediaApp.jsx` L647 écrit bien `data-panes="three"` en dur. Mais ces règles ne redéfinissent que `grid-template-columns`. J'ai cherché `data-panes` dans tout `src/` : trois occurrences, ces trois-là. Aucune règle ne masque un panneau, aucune ne réaffecte de `grid-area`. Basculer sur `two` laisserait donc le troisième panneau se placer dans une rangée implicite, hors des trois rangées déclarées en L13, sous une hauteur totale figée à `calc(100vh - 150px)`. Le repli ne se contente pas d'être inutilisé, il est incomplet.
+
+Changement de contrat exigé : aucun sur les données, mais l'affirmation qui ouvre le document 05 doit être corrigée, faute de quoi le travail sera chiffré comme un branchement d'une ligne alors qu'il demande le masquage, le déplacement et la restitution des panneaux repliés.
+
+---
+
+## 11. La sélection dans l'aperçu se fait détruire toutes les 220 ms
+
+La carte C2 est présentée dans le document 05 comme une écoute de `data-zrm-instance`. L'attribut est bien écrit, `compile.js` L214 et L227, et l'iframe est en `sandbox="allow-same-origin"` (`MediaApp.jsx` L861), donc le parent peut atteindre `contentDocument` et y poser des écouteurs. Le problème est ailleurs : `srcDoc={debouncedHtml}` (L862) est remplacé intégralement à chaque recompilation, c'est-à-dire à chaque frappe dans le brief, 220 ms après (L219). Chaque remplacement recharge le document, détruit les écouteurs posés à la main et efface tout surlignage de sélection. `onFrameLoad` doit donc devenir le point de repose systématique des écouteurs et de restitution du surlignage à partir de l'identifiant sélectionné, ce qui est une pièce de travail que ni C2 ni le document 05 ne nomment.
+
+Le même remplacement pèse sur la carte C8 : une lecture par `getAnimations()` sur `contentDocument` repart de zéro à chaque recompilation, donc la tête de lecture doit se réappliquer après chaque `load`, et non seulement à la pause initiale.
+
+---
+
+## 12. Deux appuis mineurs qui manquent, et deux réserves à écrire comme des hypothèses
+
+La page composée n'émet pas `--zrm-ease`. La variable est posée par `themeCss` en `compile.js` L117, à l'intérieur du `:root` de la voie à tokens uniquement ; la feuille de `composedPage`, L237 à L256, ne la contient pas. Le document 06 s'appuie sur `theme.motion.ease` comme sur un acquis consommé ; il l'est, mais pas sur la voie qui porterait les animations.
+
+`duplicateItem` copie l'item par étalement de surface, `composition.js` L151, `{ ...original, id: next.id }`. L'objet `props` est donc partagé par référence entre l'original et la copie. Tant que toutes les écritures passent par `patchItem`, qui reconstruit, le risque reste théorique ; il cesse de l'être dès qu'un panneau Détails écrit un champ en place. À traiter dans C1, une ligne, `props: { ...original.props }`.
+
+Deux réserves, énoncées comme telles parce que je ne les ai pas mesurées. D'abord, l'inférence du document 06 sur `exportPng` me paraît juste et je l'ai vérifiée en lecture sans la mesurer : `exporters.js` L127 à L131 recopie les `<style>` puis les enfants du `body` dans un `foreignObject` chargé comme image, et une image SVG ne rejoue pas d'animation ; avec `both`, une pièce partant de `opacity:0` sortirait invisible. Le drapeau `freezeAt` est la bonne parade. Ensuite, la même boucle ne recopie **pas** les attributs de `<html>`, en particulier `data-zrm-dark` posé en L259. Aucun thème actuel ne s'en sert, j'ai cherché `data-zrm-dark` et `html[` dans les `tokens.css` et les `parts/` sans rien trouver, mais un client de streaming sombre est exactement le genre de thème qui tendrait la main vers un sélecteur `html[data-zrm-dark]`, et son PNG sortirait alors en clair. Enfin, le pas 4 de C8 tel que décrit, la lecture par `getAnimations()`, n'est pas vérifiable dans la suite actuelle : jsdom n'implémente pas l'API Web Animations, donc ce pas exige un navigateur réel ou une abstraction injectable, ce que le document 06 présente comme « vérifiable séparément » sans le dire.
+
+---
+
+## Ordre que cette attaque impose
+
+Rien de ce qui précède ne déplace C1 de la première place, mais deux points la précèdent en coût et en risque : le harnais de test de la voie Lego, point 1, et le cadre de format absent de `composedPage`, point 2. Le premier ne coûte presque rien et rend le critère de fini de C1 vérifiable. Le second décide si le panneau Détails a des dimensions à afficher. Le point 4 corrige la spécification de C1 elle-même et doit être intégré avant d'écrire la moindre ligne. Le point 5 dit que le contrat de `normalizeComposition` s'ouvre une seule fois, au moment de C1, et non deux. Les points 6, 7 et 9 appartiennent à C8, C5 et à la rédaction du document 05, et aucun n'est bloquant pour C1.

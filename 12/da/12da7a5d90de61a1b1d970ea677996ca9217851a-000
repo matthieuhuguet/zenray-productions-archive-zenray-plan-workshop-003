@@ -1,0 +1,145 @@
+# Vision, résultats attendus et écarts
+
+## Les trois strates de vision
+
+La documentation porte trois produits successifs qui coexistent encore dans le dépôt.
+
+La conception du 25 juillet décrit une usine éditoriale déterministe : un Brief devient un Cut,
+le Cut reçoit un thème, un format le contraint, le Stage montre le résultat, le Critique le mesure,
+la Forge prépare les sorties et le Wire publie. Son équation reste pertinente :
+
+`Livrable = Rendu(Brief × Thème × Format)`.
+
+La vision I du 4 août recentre le produit sur un geste d'édition : l'interface emprunte les zones de
+Slate/UMG, le modèle emprunte la pile de Photoshop et la sortie reste un HTML aplati. Cette vision
+écarte l'arbre de widgets imbriqués et le générateur d'article comme finalité.
+
+La vision II du 5 août change la destination : ZenRayMedia devient une galerie de publications
+orientées composants HTML, qui réunit le 80/20 de six logiciels et sert d'abord Instagram et
+LinkedIn. Les articles, plans, plans architecturaux et courtes animations suivent. Substance
+Designer, Substance Painter et ZenRay Models restent explicitement reportés.
+
+Ces trois strates ne doivent ni être fondues sans décision, ni s'annuler. La première fournit la
+chaîne de production, la deuxième fournit le modèle d'interaction, la troisième fournit le résultat
+utilisateur. Le produit puissant apparaît à leur intersection.
+
+## La vision système archivée qui reste sans verdict
+
+`_source-matthieu/ZenRayMedia_Prompt_V3.md` décrit un produit encore plus large, avec sept graphes
+ou bibliothèques : Project Graph, Document Graph, Render Graph, Automation Graph, Publishing Graph,
+Asset Library et Observability. Il prévoit des espaces Create, Editor, Templates, Assets, Render,
+Publish et System, ainsi que l'extraction de composants, le rendu HTML vers vidéo, une CLI, des
+skills et une publication sociale complète.
+
+Son Publishing Graph contient précisément les fonctions qui manquent à la vision II pour devenir
+opérationnelle : intention canonique, renditions par plateforme, adaptateurs, coffre OAuth,
+idempotence, retries, webhooks, programmation, reçus et analytics. Son Render Graph décrit les jobs
+persistants que `forge.js` ne fait aujourd'hui qu'imprimer sous forme de commande. Son Asset Library
+donne un nom à la provenance et aux licences absentes du modèle courant.
+
+Le README range ce prompt parmi les archives, ce qui signifie qu'il ne fait plus autorité ; aucune
+décision vivante ne précise cependant quelles parties sont abandonnées et quelles parties restent
+nécessaires. Or la galerie, la publication et les jobs de rendu reviennent dans la vision récente.
+La documentation doit donc produire un verdict explicite, capacité par capacité : **repris**,
+**remplacé**, **reporté** ou **abandonné**. Sans cette table, la partie aval du produit disparaît du
+roadmap simplement parce que son fichier porte l'étiquette archive.
+
+Le présent audit reprend le contrat minimal de Document, Render, Publishing, Assets et
+Observability lorsqu'il sert Instagram et LinkedIn. Il ne reprend pas automatiquement tous les
+workspaces, la CLI ou l'automatisation générale, qui exigent encore un usage.
+
+## La formulation opératoire manquante
+
+La vision devient vérifiable lorsqu'elle se formule ainsi :
+
+> À partir d'un projet enregistré, l'utilisateur compose une ou plusieurs pages avec des calques et
+> des composants HTML, produit des variantes propres à chaque canal sans altérer sa source,
+> obtient des fichiers qui passent des contrôles mesurés, les publie ou reçoit un paquet prêt à
+> remettre, puis retrouve la publication, ses versions et son état dans une galerie.
+
+Cette phrase ne remplace pas le verbatim de `VISION.md`. Elle sert de contrat d'acceptation entre la
+vision et le code.
+
+## Carte de valeur
+
+| Besoin réel | Promesse | État actuel | Écart qui bloque le résultat |
+|---|---|---|---|
+| Créer vite | Templates, composants, calques, édition directe | Noyau présent | Deux modèles de composition, nombreuses commandes dispersées, composants ajoutés par deux voies |
+| Créer complexe | Sous-composants, formes, effets, contraintes, pages | Partiel | Groupes sans géométrie, Auto Layout réduit, identité DOM fragile, pages limitées aux calques |
+| Décliner | 27 formats et arbre de sorties | Partiel | 20 formats absents de l'arbre, changement de format destructif, aucune variante indépendante |
+| Livrer | HTML, PNG, PDF, vidéo | Partiel | PNG fragile, PDF non vérifiable, vidéo seulement planifiée par commande ; la boucle multi-page télécharge des fichiers séparés sans paquet ni QA par page |
+| Publier | Instagram et LinkedIn d'abord | Non réalisé | Le bouton Publier écrit une page Markdown dans Create et ne transmet pas le média visuel |
+| Retrouver | Galerie de publications | Non réalisé | Seulement des projets locaux et un navigateur de fichiers, aucun objet Publication persistant |
+| Faire confiance | Critique, déterminisme, reprise | Partiel | Contrôles centrés sur l'ancien Cut, pas d'artefacts vérifiés, pas d'autosave ni migration |
+| Étendre | 1 024 thèmes et six logiciels dans le périmètre final | Très partiel | Huit thèmes réels, contrats de paquet multiples ; Miro possède un connecteur incohérent avec les pages ; Illustrator indexe huit cartes mais ne livre que deux ajouts de code, I2 et I7, encore partiels |
+
+## Le défaut de séquence
+
+Les dernières cartes ajoutent de la largeur fonctionnelle avant que la chaîne de valeur ne soit
+fermée. La pile reçoit les contraintes de Figma, les diapositives de PowerPoint, le connecteur de
+Miro puis la Plume d'Illustrator. Une boucle télécharge désormais une image par diapositive, mais l'application ne sait
+toujours pas former un carrousel atomique et contrôlé, conserver les variantes, publier le visuel
+ni montrer la publication dans une galerie.
+
+Cette séquence produit un paradoxe : les tableaux peuvent annoncer plusieurs logiciels « 8/8 »
+tandis que l'usage prioritaire, publier une série d'images sur Instagram ou LinkedIn, reste
+impossible de bout en bout.
+
+Le correctif tient dans l'ordre des dépendances :
+
+1. fiabiliser le document, l'historique et la reprise ;
+2. donner aux pages et aux variantes une identité stable ;
+3. produire et contrôler les fichiers de toutes les pages ;
+4. créer l'objet Publication et la galerie ;
+5. seulement ensuite enrichir l'éditeur avec les familles qui servent un usage mesuré.
+
+## Contradictions documentaires
+
+| Source | Assertion | Réalité observée | Correction documentaire |
+|---|---|---|---|
+| `VISION.md` | Slate, Photoshop, Figma, PowerPoint et Miro sont affichés `8/8` | Ces fractions décrivent des cartes codées, réemployées ou écartées, non cinq produits validés de bout en bout | Afficher séparément Présent, Testé, Intégré, Validé et Prêt |
+| `VISION.md` | Illustrator est affiché `8/8` | `KANBAN.md` indexe bien I1 à I8 au commit `2156228`, mais I3 à I6 et I8 sont seulement des réemplois ou exclusions ; I2 et I7 ajoutent du code, sans preuve navigateur ni artefact autonome garanti | Remplacer la fraction unique par Décidé, Présent, Testé, Intégré, Validé et Prêt ; conserver les exclusions séparées des capacités |
+| Instruction de clôture | InDesign possède désormais un brouillon D1 à D8 | Cette extension apparaît après la photographie 6 × 8 et n'entre pas dans la demande finale | L'exclure explicitement ; lui réserver un audit daté séparé s'il devient actif |
+| `KANBAN.md` | S5 et S6 « à faire » | Le commit `0653059` annonce leur fermeture et le code contient recherche d'actifs et filtre de hiérarchie | Corriger par une nouvelle entrée, sans réécrire l'histoire si le fichier devient append-only |
+| `KANBAN.md` | L7 et L8 « à faire » | Historique et exports existent dans le code | Marquer la preuve exacte, puis conserver la validation utilisateur séparément |
+| `README.md` | Deux fichiers vivants | `KANBAN.md` affirme ailleurs être la seule page vivante | Définir une seule hiérarchie documentaire |
+| KANBAN, première ligne | 419 fichiers, 143 601 lignes, sept thèmes, 12 190 lignes de code | Les métriques ont déjà changé | Générer les chiffres, ne plus les recopier à la main |
+| Archives V1 | Sept formats, six ou sept thèmes, ancienne taille du composant | Le moteur déclare 27 formats et huit thèmes | Ajouter une bannière machine indiquant le commit historique |
+| `themes/README.md` | Deux formes de thème | Le paquet dossier à composants forme désormais le contrat dominant | Documenter un seul contrat de paquet versionné |
+| `componentCatalog.js` | 162 composants | Sept paquets contiennent 210 pièces | Générer le nombre depuis les registres |
+| `themeFonts.js` | 128 polices | 128 sous-familles partagent 114 familles distinctes | Nommer séparément mappings et familles uniques |
+| `KANBAN.md`, M6 | Supprimer un bout « fige le connecteur à sa dernière position » | `readLayers` vide la référence morte ; le compilateur ne le reconnaît plus comme connecteur et le rend comme une forme rectangulaire | Corriger le statut par une nouvelle entrée et lier la porte à un test DOM ou visuel |
+
+## Ce que la documentation doit rendre canonique
+
+Une page vivante `CAPABILITES.md`, générée autant que possible, doit porter pour chaque capacité :
+
+- son résultat utilisateur ;
+- son propriétaire dans le code ;
+- son statut Présent, Testé, Intégré, Validé et Prêt ;
+- sa porte automatisée ;
+- sa dernière validation humaine ;
+- les exclusions assumées ;
+- les formats et thèmes concernés.
+
+Le KANBAN peut alors rester un journal de travail, tandis que `VISION.md` demeure le verbatim. La
+matrice empêche qu'une carte verte devienne, par raccourci, une promesse de produit fini.
+
+## Objectifs mesurables proposés
+
+La vision atteint une première forme puissante lorsque ces dix assertions deviennent vraies :
+
+1. un projet ne perd aucune donnée entre deux versions du schéma ;
+2. un geste continu produit une seule entrée d'historique ;
+3. une page contient tous les objets qui lui appartiennent, quel que soit leur ancien modèle ;
+4. changer de format ne modifie jamais la source canonique ;
+5. un carrousel de dix pages produit dix images nommées, ordonnées et contrôlées ;
+6. chaque sortie respecte dimensions, poids, transparence, police et zone de sécurité déclarés ;
+7. la publication ou le paquet de remise demande au plus trois actions depuis un projet prêt ;
+8. la galerie distingue brouillon, prêt, exporté, programmé, publié et échoué ;
+9. fermer puis rouvrir l'application restaure l'état, la page et la sélection utiles ;
+10. un parcours navigateur reproduit ces garanties sur au moins Chrome et Safari.
+
+Ces objectifs servent Instagram et LinkedIn aujourd'hui. Ils gardent ensuite la voie ouverte aux
+articles, présentations, plans et animations sans que chaque nouvel usage reconstruise sa propre
+chaîne.

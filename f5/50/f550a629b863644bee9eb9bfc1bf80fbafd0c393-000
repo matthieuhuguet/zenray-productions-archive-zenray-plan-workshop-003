@@ -1,0 +1,34 @@
+// LES ROUTES DE PARTAGE `/watch`, `/view`, `/folder` — POINT D'ENTRÉE CLOUDFLARE (2026-08-05).
+//
+// RÉGRESSION DE LA MIGRATION, trouvée en mesurant plutôt qu'en supposant. Sur Vercel, `vercel.json`
+// réécrivait ces trois routes vers `/api/share-og?shareType=…`, et l'aperçu de lien fonctionnait.
+// La bascule a bien transposé la règle dans `_redirects`, à l'identique. Mais une réécriture
+// `_redirects` de Cloudflare Pages ne sert QUE des fichiers statiques : elle ne déclenche jamais
+// une Function. `/folder` retombait donc sur la règle suivante, `/* /index.html`, et l'on recevait
+// l'`index.html` brut — sans la moindre balise Open Graph, pas même les valeurs par défaut. D'où
+// « ZenRayProgress — Matthieu Huguet » et l'icône Z partout.
+//
+// MESURÉ AVANT DE CORRIGER, pour ne pas réparer la mauvaise pièce : appelée en direct,
+// `/api/share-og?shareType=folder&d=…` rend le bon titre, la bonne description et une vignette de
+// 567 ko servie en `image/webp`. Le handler n'avait rien ; seul le chemin pour l'atteindre manquait.
+//
+// Sur Cloudflare, une route hors `/api/` s'obtient par un FICHIER de fonction portant son nom.
+// `functions/folder.js` répond donc à `/folder`, et délègue au routeur habituel en lui passant le
+// type de partage. Les trois fichiers ne portent que ce type ; toute la mécanique vit ici.
+import { setPlatform, cloudflarePlatform } from '../server/_platform.js'
+import { adapterHandlerNode } from '../server/_cloudflare-adapter.js'
+import routeur from '../api/[...route].js'
+
+export function partage(shareType) {
+  return function onRequest(context) {
+    setPlatform(cloudflarePlatform(context.env))
+    // Le type voyage en paramètre de requête, exactement comme le faisait la réécriture Vercel :
+    // `share-og` le lit dans `req.query.shareType`, et la query d'origine (`?d=…`) est conservée.
+    const url = new URL(context.request.url)
+    url.searchParams.set('shareType', shareType)
+    const requete = new Request(url.toString(), context.request)
+    // `route: ['share-og']` est ce que le routeur attend comme premier segment : c'est ainsi qu'il
+    // choisit le handler, sans que l'URL visible par le visiteur change d'un caractère.
+    return adapterHandlerNode(routeur, requete, context.waitUntil?.bind(context), { route: ['share-og'] })
+  }
+}

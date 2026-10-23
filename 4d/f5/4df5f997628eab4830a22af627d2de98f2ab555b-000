@@ -1,0 +1,206 @@
+# ZenRayMedia V1 — le plan d'implantation
+
+Écrit le 2026-08-01. Il corrige les documents 05, 06 et 07 de tout ce que les trois attaques
+adversariales ont trouvé, et il est exécutable par quelqu'un qui n'a lu aucune des conversations qui
+l'ont produit.
+
+> **Ce plan a été synthétisé dans la boucle principale, pas par un agent.** Le onzième agent du
+> workflow est tombé sur la limite mensuelle de dépense après que les dix autres eurent rendu. Les
+> chiffres qui portent une décision sont donc revérifiés à la main ci-dessous, et ceux qui viennent
+> d'un agent sans avoir été recomptés sont signalés comme tels.
+
+---
+
+## La phrase qu'il faut lire avant tout le reste
+
+Elle vient de l'attaque sur la réinvention, et elle résume les quatorze points de ce rapport :
+
+> **À chaque fois qu'un des trois documents décrit une pièce comme absente, elle existe, mais sur
+> l'autre voie de compilation, dans l'autre couche de jetons, ou sur la carte voisine du tableau. Le
+> réflexe qui manque n'est pas de lire davantage de code, c'est de chercher la pièce sous son autre
+> nom.**
+
+C'est la faute la plus coûteuse de ce projet et elle a été commise ce jour-là par trois agents
+indépendants qui avaient pourtant ordre de lire avant de proposer. Tenir cette phrase en tête vaut
+mieux que relire ce plan en entier.
+
+---
+
+## 1. Ce qui existe déjà et se réutilise
+
+Première section délibérément, parce que c'est celle qu'on saute et celle qui coûte le plus cher.
+
+| Pièce | Où | À savoir avant de la réécrire |
+|---|---|---|
+| Modèle de composition | `src/zenraymedia/composition.js` | Sérialisable, immuable, l'étalement L25-L30 fait déjà survivre le champ `anim`. |
+| Compilation | `src/zenraymedia/compile.js` | **Deux voies** coexistent. Presque toutes les erreurs des trois documents viennent d'avoir raisonné sur une seule. |
+| Découpage temporel | `src/zenraymedia/cut.js` | **C'est déjà la partition temporelle du produit.** Une timeline neuve la réinventerait. |
+| Critique | `src/zenraymedia/critic.js` | Contraste WCAG et débordements mesurés, **aveugle à la voie Lego**, ce qui est un défaut et non une absence. |
+| Export | `src/zenraymedia/exporters.js` | HTML autonome avec polices en base64. `exportPng` perd le fond et les attributs de la racine (hypothèse posée par un agent, **non mesurée**). |
+| Thèmes | `src/zenraymedia/themes/` + `registry.js` | Sept thèmes, `parts/*.html` avec en-tête `<!--zrm …-->`, chargement déjà paresseux par `import.meta.glob`. |
+| Jetons de mouvement | `--g9-ease`, `--g9-timing`, `theme.motion` | **Les courbes et les durées existent déjà.** Le document 06 en proposait trente et sept de plus sans les avoir cherchées. |
+| Zones de sécurité | carte C6 du KANBAN | **Déjà faite.** La conception la traitait comme à faire. |
+| Placement | `placementAt` | **Déjà invariant d'échelle.** Le multiplier par le zoom, comme proposé, le casserait. |
+| Couleurs | `src/config/colors.js` | Source unique. `media.css` ne peut pas l'importer : la couleur passe en ligne depuis le JS. |
+| Icônes | `src/components/Icon.jsx` | Le compte donné par un agent est **faux et présenté comme mesuré**. À recompter avant de s'y fier. |
+
+---
+
+## 2. L'ordre des étapes
+
+Chaque étape porte un critère de fini vérifiable par une commande. Une étape sans critère
+vérifiable n'est pas une étape.
+
+### Étape 0 — Le harnais de test de la voie Lego
+
+**Pourquoi d'abord :** elle ne coûte presque rien et elle rend le critère de fini de C1 vérifiable.
+Sans elle, on ne saura pas dire si C1 est faite. Vérifié à la main : **aucun fichier de test ne
+couvre la voie Lego**, et le fichier que le KANBAN cite comme preuve n'existe pas.
+
+**Fini quand :** `npx vitest run src/zenraymedia/` couvre une composition Lego de bout en bout,
+depuis `normalizeComposition` jusqu'à la chaîne HTML produite.
+
+### Étape 1 — Le cadre de format dans `composedPage`
+
+**Pourquoi ici :** cinq formats sur sept mentent aujourd'hui, faute de bornes sur le canevas. C'est
+cette étape qui décide si le panneau Détails a des dimensions à afficher, donc elle précède toute
+l'interface.
+
+**Fini quand :** les sept formats déclarés rendent un canevas aux dimensions annoncées, vérifié par
+un test qui compare la géométrie produite aux valeurs de `formats.js`.
+
+### Étape 2 — C1, un composant posé porte ses propres valeurs
+
+**Le blocage réel, et il est pire que le KANBAN ne le dit.** Vérifié à la main :
+
+```
+grep -rn "\.props" src/zenraymedia/ | grep -v test
+→ src/zenraymedia/compile.js:214   (une seule ligne, ratio et rayon d'une image)
+```
+
+**Aucun composant de texte ne lit jamais ses propres valeurs.** Poser deux fois le même titre donne
+donc deux fois le même texte, et un éditeur type UMG sans cela n'existe pas, puisque le geste
+fondamental d'UMG est de sélectionner un widget et d'éditer ses propriétés.
+
+**Correction obligatoire de la spécification, trouvée par l'attaque de faisabilité :** la fusion
+`{ ...data, ...item.props }` telle qu'écrite **efface le brief au lieu de le compléter**. Une pièce
+dont une seule propriété est renseignée perdrait toutes les autres. La fusion doit se faire
+propriété par propriété, en ne prenant `item.props` que là où il est défini.
+
+**Le contrat de `normalizeComposition` s'ouvre UNE seule fois, ici.** Ne pas le rouvrir plus tard.
+
+**Fini quand :** je pose deux fois le titre d'écran, je leur donne deux textes différents,
+j'enregistre, je réouvre, les deux textes sont là. Un test le vérifie sans navigateur.
+
+### Étape 3 — Les huit zones
+
+L'architecture du document 05, corrigée de ses points de réinvention. Trois rappels qui changent le
+travail : le zoom manuel **ne peut pas** n'écrire que dans `fitScale`, qui n'est pas inscriptible ;
+le format se change déjà à trois endroits et la zone Outils rapides en ferait un quatrième ; la
+barre du bas n'est pas enfant de la grille, donc son repli ne rend aucune place à l'aperçu.
+
+**Le seul acquis à préserver absolument**, et Matthieu l'a nommé : l'édition d'un composant depuis
+les quatre côtés. Toute refonte qui le perd est un échec, quel que soit le reste.
+
+**Fini quand :** les huit zones sont à l'écran, chacune peut se replier, et l'édition par les quatre
+côtés fonctionne comme avant.
+
+### Étape 4 — La sélection dans l'aperçu
+
+**Attention, deux pièges relevés par deux attaques indépendantes.** La sélection **se fait détruire
+toutes les 220 ms** par la recompilation, et le dépôt dans l'aperçu tel qu'il était écrit
+introduirait précisément le bug qu'il prétend éviter.
+
+**Fini quand :** un clic dans l'aperçu surligne la ligne correspondante dans la hiérarchie, et la
+sélection survit à trente secondes d'inactivité.
+
+### Étape 5 — Le thème Spotify
+
+48 composants, voir la section 5. Il vient après l'interface parce qu'il en est le premier client :
+c'est lui qui prouvera qu'un thème se pilote depuis les huit zones.
+
+**Fini quand :** le thème apparaît dans l'onglet Media, et modifier une valeur dans le panneau
+Détails change le rendu sans toucher au code.
+
+---
+
+## 3. Les fichiers à créer
+
+| Chemin | Rôle |
+|---|---|
+| `src/zenraymedia/lego.test.js` | Le harnais de l'étape 0. |
+| `src/zenraymedia/panels/Details.jsx` | Le panneau de propriétés, alimenté par la sélection. |
+| `src/zenraymedia/panels/Hierarchy.jsx` | L'arbre des pièces posées. |
+| `src/zenraymedia/panels/Palette.jsx` | La bibliothèque de composants, filtrée par famille. |
+| `src/zenraymedia/themes/T-XX--spotify/` | Le thème et ses 48 parts. |
+
+---
+
+## 4. Les fichiers à modifier, et ce qui casse si l'on se trompe
+
+| Fichier | Ce qui change | Ce qui casse |
+|---|---|---|
+| `composition.js` | Le contrat s'ouvre pour `item.props`. | Les documents déjà enregistrés, si la migration n'est pas rétrocompatible. |
+| `compile.js` | La fusion propriété par propriété, sur **les deux voies**. | N'en traiter qu'une laisse la moitié des thèmes inchangés, sans erreur visible. |
+| `critic.js` | Voir la voie Lego. | Rien, il est aveugle aujourd'hui. |
+| `MediaApp.jsx` | Réorganisation en huit zones. | L'édition par les quatre côtés, le seul acquis à ne pas perdre. |
+
+---
+
+## 5. Le thème Spotify
+
+Le document 07 décrit **48 composants**, recomptés à la main dans son tableau, ce qui tient dans la
+fourchette de 32 à 64 demandée. La liste définitive vit dans `07-theme-spotify.md` et n'est pas
+recopiée ici : une liste à deux endroits diverge à la première retouche.
+
+Trois demandes explicites de Matthieu, à ne pas perdre en route. Les **dégradés**, où l'on choisit
+deux couleurs et l'on obtient la texture du haut. Les **pochettes en couches**, un fond, un milieu,
+un premier plan, en SVG plutôt qu'en image matricielle. Les **icônes** en SF Symbols, sachant que le
+compte donné par l'agent est faux et doit être refait.
+
+**Réserve mesurée :** un thème de forme 3 n'a droit qu'à un seul format dans le catalogue, ce qui
+contredit la section 1 du document 07. À trancher avant d'écrire la première part.
+
+---
+
+## 6. Ce qu'on ne fait PAS en V1
+
+Section obligatoire, parce qu'un plan sans limites écrites déborde toujours.
+
+**Pas d'animation.** Le document 06 fait 481 lignes et propose une timeline complète, mais l'attaque
+sur la réinvention montre qu'elle réinventerait `cut.js`, et l'attaque sur la faisabilité montre que
+le champ `timeline` **serait détruit à chaque geste**, pas seulement au rechargement, et qu'aucun
+chemin ne mène de la timeline à la Forge. Trois défauts structurels sur une feature qui n'existe pas
+encore : elle attend une V2, et le document reste sur disque pour cette V2.
+
+**Pas de conteneurs de mise en page imbriqués** (Canvas, Overlay, StackBox, SizeBox). C'est la carte
+C7, la plus lourde du tableau, et elle change le contrat de `composition.js` que C1 vient tout juste
+d'ouvrir. Les rouvrir deux fois dans la même version est la meilleure façon de casser les documents
+existants.
+
+**Pas d'export PNG fidèle.** Le défaut est identifié, le fond et les attributs de la racine se
+perdent, mais il repose sur une **hypothèse non mesurée**. Mesurer d'abord.
+
+**Pas d'annulation.** C'est la carte C3, elle n'appartient à aucune des huit zones, et elle
+s'annule surtout sur ce qu'on vient de manipuler directement, donc après l'étape 4.
+
+---
+
+## 7. Les risques retenus, et leur parade
+
+| Risque | Parade |
+|---|---|
+| Traiter une seule des deux voies de compilation. | Tout test de C1 s'exécute sur les deux, sans exception. |
+| Rouvrir `normalizeComposition` deux fois. | Le contrat s'ouvre à l'étape 2 et plus jamais en V1. |
+| Se fier aux numéros de ligne des trois attaques. | Elles signalent elles-mêmes une **dérive de leurs références**. Recompter avant de s'y fier. |
+| Perdre l'édition par les quatre côtés. | Critère de fini explicite de l'étape 3. |
+| Réinventer une pièce existante. | La phrase en tête de ce document, et un `grep` avant chaque « ça n'existe pas ». |
+
+---
+
+## Ce que ce plan ne sait pas
+
+Trois choses, nommées plutôt que masquées. Le comportement d'`exportPng` est une **hypothèse**, pas
+une mesure. Le compte d'icônes du document 07 est **faux** et n'a pas été refait ici. Et les numéros
+de ligne des trois attaques **dérivent**, leurs auteurs le disent eux-mêmes, donc toute implantation
+doit les recompter au lieu de les croire.

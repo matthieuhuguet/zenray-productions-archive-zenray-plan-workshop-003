@@ -1,0 +1,332 @@
+# ZenRayMedia v1 — anatomie du système de thèmes
+
+Document de relevé, pas de proposition. Tout ce qui suit vient de fichiers lus dans le dépôt
+`/Users/zenray/Create/Build/Productions/GithubProductions/ZenRayProgress`, et chaque chemin cité
+existe. Ce que je n'ai pas lu est signalé comme tel ; ce qui est une déduction est écrit comme une
+déduction.
+
+Fichiers réellement lus pour l'écrire : `src/zenraymedia/themes/registry.js`,
+`src/zenraymedia/themes/README.md`, `src/zenraymedia/componentCatalog.js`,
+`scripts/zrm-build-theme.mjs`, `scripts/zrm-paths.mjs` (les 45 premières lignes),
+`src/zenraymedia/compile.js` (lignes 180 à 310), `src/zenraymedia/htmlTemplate.js` (lignes 80 à
+117), `docs/zenraymedia/KANBAN.md` (les 120 premières lignes), et trois thèmes complets :
+`T-01-1-3--quotidien-de-reference-sobre`, `T-01-1-4--quotidien-economique-saumon`,
+`T-04-1-1--revelation-cinematique`, avec leurs `theme.json`, `tokens.css`,
+`component-registry.json`, plusieurs `parts/*.html` et, pour le dernier, son `PROTOCOLE.md`.
+
+---
+
+## 1. Le format exact d'un thème
+
+Il faut d'abord dire une chose que le seul `README.md` ne dit pas, et qui explique tout le reste :
+il existe **trois formes de thème dans le dépôt, pas deux**. Le README de
+`src/zenraymedia/themes/` n'en documente que deux, parce qu'il a été écrit avant la troisième.
+
+### Forme 1, le thème à tokens : `T-FF-S-V.theme.js`
+
+Un seul exemplaire sur disque, `src/zenraymedia/themes/T-01-3-2.theme.js`, que je n'ai pas ouvert.
+Le registre le charge en dur (`import.meta.glob('./*.theme.js', { eager: true })`), il porte lui
+même son `id`, son `name`, sa `description` et ses `formats`, et le compilateur fabrique le CSS
+depuis les sept groupes décrits dans `docs/zenraymedia/01-PLAN.md §10.2` (`surface`, `palette`,
+`typography`, `grid`, `motion`, `chrome`, `sound`). Le README le présente comme la forme qui
+s'adapte à tous les formats sans réécriture.
+
+### Forme 2, le gabarit HTML plat : `T-FF-S-V--slug.html`
+
+C'est ce que le registre découvre par `import.meta.glob('./*.html', { query: '?raw' })`, en
+chargement paresseux. Le contrat de nommage est strict, et il porte à lui seul les métadonnées du
+catalogue : `FF` la famille sur deux chiffres, `S` la sous-famille, `V` la variante, puis `--` et
+le slug public. Un fichier hors contrat est ignoré, avec un avertissement en console émis par
+`entriesFromHtml()`. La raison est écrite en commentaire dans `registry.js` et elle est
+d'architecture, non d'optimisation : lister mille vingt-quatre thèmes doit coûter mille
+vingt-quatre chaînes de caractères, jamais la lecture de leur contenu.
+
+Le fichier peut porter en tête un en-tête déclaratif `<!--zr-theme { … } -->`, lu par
+`readThemeHeader()` **après** chargement, donc sans coût pour le listing. Il n'a aucun droit sur
+l'identité : ni sur l'`id`, ni sur le nom public, qui viennent du nom de fichier. Il peut en
+revanche remplacer `description`, `formats`, `beatCount`, `measure`, `calibration`, `fonts` et
+fusionner un objet `typography`. Un JSON invalide n'empêche jamais le gabarit de fonctionner :
+il est signalé en console et les valeurs neutres s'appliquent.
+
+Ces valeurs neutres viennent de `htmlThemeShell()` dans `registry.js`, et elles remplissent les
+sept groupes de manière à ce que `validate('theme', theme)` passe et que le Critique ait des
+seuils. Sans déclaration de polices, le gabarit hérite de la police de sa sous-famille via
+`defaultFontFor(entry.id)` (`themeFonts.js`, non lu).
+
+### Forme 3, le thème à composants : un DOSSIER `T-FF-S-V--slug/`
+
+C'est la forme réellement vivante aujourd'hui : les six thèmes présents sur disque en relèvent.
+Le dossier n'est pas chargé tel quel par `registry.js` ; il est **compilé** par
+`scripts/zrm-build-theme.mjs` vers un gabarit plat `T-FF-S-V--slug.html` déposé à côté, lequel
+redevient un thème de forme 2 pour le registre. Le dossier, lui, est lu directement par
+`src/zenraymedia/componentCatalog.js`, qui alimente l'éditeur Lego.
+
+Quatre entrées, et rien d'autre, selon la doctrine posée en tête de `scripts/zrm-paths.mjs` :
+le livrable vit dans `src/`, la matière vit dans `docs/zenraymedia/ateliers/`, et rien ne traverse.
+
+| Fichier | Obligatoire | Rôle |
+|---|---|---|
+| `theme.json` | oui, `buildTheme()` le lit sans repli | description, `formats`, `beatCount`, `measure`, `fonts`, `calibration` |
+| `tokens.css` | oui, lu sans repli | les variables mesurées ; émis une seule fois dans le gabarit |
+| `parts/*.html` | oui, au moins un, sinon `aucun composant dans parts/` | un fragment par composant |
+| `component-registry.json` | **généré**, jamais écrit à la main | liste ordonnée `id`, `name`, `group`, `role`, `reference`, `file`, `standalone` |
+
+Le contenu de `theme.json` est exactement l'objet réinjecté tel quel dans l'en-tête
+`<!--zr-theme …-->` du gabarit compilé, ce qui se vérifie en comparant
+`T-01-1-3--quotidien-de-reference-sobre/theme.json` et les premières lignes de
+`T-01-1-3--quotidien-de-reference-sobre.html`, identiques au caractère près. Autrement dit, la
+forme 3 n'invente pas un second format de métadonnées : elle écrit la source de l'en-tête de la
+forme 2.
+
+Le champ `calibration` mérite d'être noté, car c'est là que vit l'honnêteté du système. Il porte
+un `ref` privé, jamais rendu, jamais poussé (règle de marque du README, contrôlée par
+`validateTheme` dans `contracts.js`, que je n'ai pas ouvert), et il porte surtout un tableau
+`fontDetection` où chaque relevé indique s'il est `confident`. Le thème T-01-1-3 déclare
+explicitement trois sondes non décisives, dont une invalide ; le thème T-01-1-4 déclare deux
+polices confirmées à l'œil par Matthieu contre la mesure. Le format enregistre donc la mesure ET
+son degré de certitude, ce qui est rare et qu'il faudra préserver.
+
+`tokens.css` porte l'identité chiffrée du thème, sous forme de variables `--zrm-*`, `--f-*`,
+`--s-*`, plus `--u` et `--measure`. Les noms sont volontairement stables d'un thème à l'autre :
+T-01-1-3 comme T-01-1-4 conservent le jeu de variables de T-01-1-2 et ne changent que les valeurs,
+puisque les composants hérités s'en servent et que les renommer casserait tout sans rien apprendre.
+Deux thèmes de presse portent, en fin de fichier, le même avertissement gagné à l'usage : aucune
+règle de composant dans `tokens.css`, parce que le compilateur émet les tokens AVANT les styles de
+composant, si bien qu'à spécificité égale le composant gagne toujours et que la règle placée là
+serait morte tout en donnant l'illusion d'une correction.
+
+Deux fichiers optionnels existent : un `README.md` dans
+`T-01-1-1--une-nationale-du-matin/`, et un `PROTOCOLE.md` dans
+`T-04-1-1--revelation-cinematique/`, qui est la meilleure page de méthode du dossier.
+
+Un écart entre l'intention et le code, que je signale sans le corriger : `zrm-paths.mjs` déclare
+que les pages de documentation, `home.html` et `component-lab.html` vivent désormais sous
+`docs/zenraymedia/ateliers/<thème>/doc/`, or `zrm-build-theme.mjs` les écrit toujours dans le
+dossier du thème sous `src/` (lignes 162, 293 et 362 : `path.join(dir, 'components')`,
+`component-lab.html`, `home.html`). Sur disque, ces sorties sont absentes des six thèmes, et
+`git check-ignore` ne les ignore pas. Je n'ai pas cherché le commit qui les a retirées ; la lecture
+la plus simple est que le script n'a pas encore été aligné sur la doctrine de `zrm-paths.mjs` et
+qu'un nettoyage manuel a précédé cet alignement.
+
+---
+
+## 2. Le format exact d'une PART
+
+Une part est un **fragment**, pas un document : ni `<!doctype>`, ni `<html>`, ni `<head>`. Elle se
+compose de trois zones, dans cet ordre, et `parsePart()` dans `zrm-build-theme.mjs` les sépare
+par expression régulière.
+
+D'abord un commentaire de provenance facultatif, en clair. Les parts héritées le portent, par
+exemple en tête de `T-01-1-4--quotidien-economique-saumon/parts/09-section-band.html` : « HÉRITÉ
+de T-01-1-2 … les mesures sont celles de l'autre média et sont FAUSSES ici tant qu'elles n'ont pas
+été relevées ». Ce commentaire n'a aucun effet technique, mais il marque la dette de calibrage
+part par part, ce qui est précieux.
+
+Ensuite l'en-tête déclaratif `<!--zrm { … } -->`, en JSON. Il est facultatif dans le code, puisque
+`parsePart()` renvoie `{}` en son absence, mais un JSON illisible fait **échouer la compilation**
+avec le message `en-tête <!--zrm …--> illisible (JSON invalide)`. Sur les 162 parts du dépôt, les
+clefs réellement employées, comptées à la main sur les en-têtes, sont exactement au nombre de cinq.
+
+| Clef | Occurrences | Effet exact |
+|---|---|---|
+| `name` | 162 | titre du document autonome, `name` du registre, en-tête de carte dans la planche |
+| `group` | 162 | `group` du registre, donc rangement dans la bibliothèque de l'éditeur (`groupComponents`) |
+| `reference` | 162 | la capture source, tracée dans le registre et la planche ; jamais rendue en page |
+| `order` | 162 | ordre d'insertion dans le corps du gabarit compilé, défaut 99 |
+| `inPage` | 97 | à `false`, la part est exclue du corps du gabarit mais reste au catalogue |
+
+Deux clefs sont lues par le code et **jamais employées sur disque** : `role`, qui tombe à `null`
+dans toutes les entrées de registre, et `props`, qui n'existe pas du tout et qui est précisément
+l'objet de la carte C1 du KANBAN.
+
+Vient ensuite un ou plusieurs blocs `<style>`. Ils sont concaténés, jamais scopés : c'est le
+préfixe de classe `zrm-` qui tient lieu d'isolation. Enfin le markup, c'est-à-dire tout ce qui
+reste une fois l'en-tête et les `<style>` retirés ; un markup vide fait échouer la compilation.
+
+### Ce que la part reçoit, et par quelle mécanique
+
+Le markup est un gabarit au sens de `htmlTemplate.js`, avec quatre constructions et pas une de
+plus : `{{champ}}` échappé, `{{{champ}}}` brut, `{{#beats}} … {{/beats}}` en boucle,
+`{{^beats}} … {{/beats}}` pour la liste vide. Les variables disponibles viennent de
+`templateData()` dans `compile.js` : `title`, `message`, `audience`, `register`, `intent`,
+`themeName`, `formatLabel`, `readingMinutes`, `words`, `duration`, et le tableau `beats` dont
+chaque élément porte `index`, `number`, `role`, `roleLabel`, `text`, `html`, `weight`, `tempo`,
+`duration`, auxquels `renderScope()` ajoute `isFirst` et `isLast`.
+
+Il faut être précis sur les deux chemins de remplissage, car ils ne sont pas le même code.
+
+Au **rendu dans l'éditeur**, `composedPage()` dans `compile.js` parcourt les lignes de la
+composition, retrouve l'entrée par `item.componentId`, la découpe par `splitPart()` — qui retire
+l'en-tête `zrm` et extrait les `<style>` —, puis appelle `renderTemplate(part.body, data)` où
+`data` est **global au document**, enveloppe le résultat dans une `<section class="zrm-lego-item"
+data-zrm-instance data-zrm-component>` et empile les styles collectés en tête de page. Les tokens
+du thème sont injectés une fois, via `bundle.tokensCss`. La planche de signes est traitée à part :
+`bundle.definitionsHtml`, c'est-à-dire la part dont l'`id` vaut `00-icons`, est insérée dans un
+`<div hidden>` en tête de `<body>`, ce qui permet aux autres parts d'employer leurs
+`<use href="#…">` sans imposer d'ordre de pose.
+
+À la **compilation par le script**, `zrm-build-theme.mjs` fait le même découpage mais remplit les
+variables avec l'échantillon codé en dur de `sampleFor()`, pour que le composant montre quelque
+chose lorsqu'on l'ouvre seul, et produit quatre sorties depuis la même source : les documents
+autonomes `components/<id>.html` avec tokens et polices en base64 embarqués, le
+`component-registry.json`, le gabarit plat `<thème>.html` consommé par le registre, la planche
+`component-lab.html` et la composition `home.html`.
+
+Les garde-fous de fin de `buildTheme()` sont eux aussi le format, puisqu'ils définissent ce qui est
+refusé : aucune URL distante, aucun `@import`, aucun `fetch(`, aucun `<iframe`, aucun `<script`,
+et le gabarit doit consommer `{{#beats}}` et `{{title}}` sous peine d'être muet. S'ajoute une règle
+de police qui a été payée : un thème qui **nomme** une police sans qu'aucune `@font-face` ne soit
+produite est refusé, parce que le navigateur retombait silencieusement sur un repli et laissait
+croire que rien n'avait changé.
+
+Une dernière contrainte, propre au thème de jeu et documentée dans son `PROTOCOLE.md` : les
+composants qui doivent tenir dans les sept formats emploient des unités relatives au conteneur.
+`11-screen-title.html` explique, mesures à l'appui, pourquoi tout y est en `cqh` et non en `cqw` :
+un titre est une ligne de texte, sa taille dépend de la hauteur de sa boîte, et le calage en `cqw`
+rendait le titre quarante pour cent trop gros dès que la boîte s'élargissait.
+
+---
+
+## 3. Combien de parts existent aujourd'hui
+
+Compté sur disque, `find src/zenraymedia/themes -type f -path "*/parts/*.html" | wc -l` : **162**.
+
+| Thème | Parts |
+|---|---|
+| `T-01-1-1--une-nationale-du-matin` | 25 |
+| `T-01-1-2--une-de-rupture` | 25 |
+| `T-01-1-3--quotidien-de-reference-sobre` | 26 |
+| `T-01-1-4--quotidien-economique-saumon` | 25 |
+| `T-01-1-5--tabloid-daccroche` | 25 |
+| `T-04-1-1--revelation-cinematique` | 36 |
+
+Le chiffre 162 est cohérent avec le commentaire en tête de `componentCatalog.js`, qui le cite
+lui aussi. Les quatre thèmes de presse à 25 parts portent rigoureusement la même liste, de
+`01-masthead` à `25-footer` ; T-01-1-3 en compte 26 parce qu'il est le seul de presse à porter une
+planche `00-icons.html`. Le thème de jeu, lui, a une liste entièrement différente, de
+`00-icons` à `35-scene-extras`, ce qui est exactement le constat qui justifie la carte C4 du
+KANBAN : l'interface suppose encore un inventaire de presse alors que le registre de chaque thème
+déclare déjà le sien.
+
+---
+
+## 4. Une part peut-elle déclarer des champs ÉDITABLES ?
+
+Non. Pas aujourd'hui, et l'absence est nommée, datée et priorisée dans le dépôt.
+
+Ce qui existe s'arrête à la lecture d'un contexte global. `composedPage()` appelle
+`renderTemplate(part.body, data)` avec le même `data` pour toutes les pièces de la page, si bien
+que poser deux fois « Titre d'écran » produit deux fois le même texte. Le modèle porte pourtant
+déjà un `item.props`, sérialisé et persistant selon le KANBAN, mais, toujours selon le KANBAN,
+personne ne l'écrit et personne ne le lit. Je n'ai pas ouvert `composition.js` pour vérifier
+moi-même la présence de `props` dans le modèle : je rapporte ici ce que la carte C1 affirme, et
+je le signale comme non vérifié de ma main.
+
+Ce qui manque tient en trois pièces, telles que la carte C1 les énumère, et elle est déclarée
+bloquante pour toutes les autres. D'abord une clef `props` dans l'en-tête `<!--zrm …-->`, tableau
+de champs portant `key`, `label`, `type` et `default`, où le `default` reste un gabarit du genre
+`"{{title}}"`, de sorte qu'une pièce non renseignée continue de lire le brief et qu'aucun composant
+existant ne casse. Ensuite la fusion dans `compile.js`, qui devient
+`renderTemplate(part.body, { ...data, ...item.props })`. Enfin un quatrième panneau Détails dans
+l'interface, alimenté par la sélection courante, qui écrit par
+`patchItem(composition, id, { props })`.
+
+Il y a une nuance à ne pas manquer, et elle vient du `PROTOCOLE.md` de T-04-1-1 : le travail
+d'éditabilité a déjà commencé côté composants. Les trente-six pièces échafaudées portaient à
+l'origine un texte figé, au point que `compile.js` embarquait une rustine réécrivant le contenu de
+tout `<h1>` à `<h3>` avec le titre du brief. Cette rustine détruisait le balisage interne des
+titres et a été supprimée le 2026-07-28, les composants lisant désormais `{{title}}` comme
+n'importe quel gabarit. La doctrine qui en est sortie est écrite noir sur blanc et vaut d'être
+retenue : la fidélité s'arrête là où l'éditabilité commence, et c'est l'éditabilité qui gagne,
+puisqu'une pièce non posable ne sert à rien dans un éditeur.
+
+Autrement dit, la moitié amont du problème est faite — les parts lisent des variables au lieu de
+porter des textes en dur —, et c'est la moitié aval qui manque : la valeur par instance.
+
+---
+
+## 5. Ce qui est réutilisable tel quel pour un thème Spotify
+
+Je ne connais pas d'atelier Spotify existant dans le dépôt ; je n'ai pas cherché sous
+`docs/zenraymedia/ateliers/`. Ce qui suit est donc une lecture de transférabilité à partir du
+système observé, pas un état d'avancement.
+
+### Réutilisable sans écrire une ligne de moteur
+
+Toute la chaîne d'accueil l'est. Déposer un dossier `T-FF-S-V--slug/` avec ses quatre entrées,
+lancer `node scripts/zrm-build-theme.mjs <dossier>`, et le thème apparaît dans le Deck au build
+suivant : la découverte par `import.meta.glob`, la dérivation des métadonnées depuis le nom de
+fichier, le chargement paresseux, la validation au chargement et la mise en cache ne demandent
+aucune adaptation. La famille se choisit dans la taxonomie existante, et je note que `taxonomy.js`,
+tel que le cite le `PROTOCOLE.md`, propose « 09 Musique & sound », qui est la case naturelle. Je
+n'ai pas ouvert `taxonomy.js`, donc je ne garantis pas le libellé exact.
+
+Réutilisable également : le format de part avec ses cinq clefs d'en-tête, le moteur de gabarit à
+quatre constructions, le mécanisme de planche `00-icons` avec ses `<symbol>` injectés une fois par
+page, l'émission des tokens en tête suivie des styles de composant, l'embarquement des polices en
+base64, et l'ensemble des garde-fous, qui sont indifférents au média reproduit.
+
+Réutilisable aussi, et c'est peut-être le plus précieux, la **méthode** : le `PROTOCOLE.md` de
+T-04-1-1 décrit un pipeline en dix étapes, de la collecte des captures à l'inscription au registre,
+avec la règle des treize itérations, le vérificateur par superposition `zrm-check`, et une liste
+des cinq façons de se tromper. Il pose d'ailleurs lui-même que ce qui y est fixé tient pour les
+1023 autres thèmes.
+
+Enfin, structurellement, le thème de jeu est le meilleur point de départ pour Spotify parmi les six,
+et cela n'a rien d'un jugement de goût : c'est le seul dont les parts sont pensées pour une
+interface posée sur une image, avec des unités liées au conteneur, des voiles, des halos et une
+planche de signes. Une interface d'application musicale est, de ce point de vue, plus proche d'un
+ATH de jeu que d'une une de quotidien.
+
+### Non réutilisable, à produire ou à corriger
+
+Les cinq thèmes de presse ne transfèrent rien d'autre que leur structure de dossier. Leur liste de
+25 parts, `masthead`, `nav-primary`, `ticker`, `rail`, `newsletter`, `read-also`, `pullquote`,
+`section-band`, est une taxonomie de journal ; Spotify demande une liste étrangère, du genre
+barre de lecture, pochette, file d'attente, liste de pistes, carte d'album, en-tête d'artiste,
+barre latérale de bibliothèque. Aucune des parts existantes n'est reprenable telle quelle.
+
+Le fichier `tokens.css` est intégralement à remesurer, et je note un piège concret : le jeu de
+variables actuel est nommé pour de la presse, `--zrm-paper`, `--zrm-rule`, `--zrm-meta`,
+`--zrm-band`. Deux thèmes de presse expliquent qu'ils ont conservé ces noms exprès, pour ne pas
+casser les composants hérités. Un thème Spotify n'hérite d'aucun composant de presse, donc il est
+libre de nommer ses variables selon son propre domaine ; mais alors le générique
+`body{background:var(--zrm-scene, var(--zrm-wash, …))}` de `zrm-build-theme.mjs` et le
+`html,body{background:var(--zrm-paper,var(--zrm-bg,#fff))}` de `compile.js` supposent, eux, des
+noms précis. Le repli existant couvre `--zrm-scene`, `--zrm-wash`, `--zrm-paper` et `--zrm-bg` ;
+il faudra donc en employer au moins un, ou toucher au moteur.
+
+La composition `home.html` produite par le script est codée en dur pour la presse : elle appelle
+nommément `01-masthead`, `03-nav-primary`, `13-card-v`, `14-card-h`, `17-promo-module`,
+`15-card-compact`, `16-rail`, `24-newsletter`, `18-ticker`, et sa grille est décrite comme relevée
+sur une capture de journal. Pour un thème non journalistique, `pick()` renvoie la chaîne vide et
+la home sort creuse. Ce n'est pas bloquant, puisque cette sortie ne conditionne rien dans
+l'application, mais il ne faut pas la lire comme une preuve.
+
+Deux dépendances codées en dur imposent en revanche une modification de code, minuscule mais
+réelle. `componentCatalog.js` importe les six `tokens.css` par des `import` statiques et les range
+dans un objet `tokenSheets` indexé par identifiant de thème ; un septième thème n'aura pas ses
+tokens dans l'éditeur tant que ces deux lignes ne seront pas ajoutées. Il faudra donc soit ajouter
+la ligne, soit passer ce chargement à `import.meta.glob`, comme le sont déjà les registres et les
+parts.
+
+Reste le manque de fond, qui n'est pas propre à Spotify mais qui le touche de plein fouet : sans
+la carte C1, deux cartes d'album posées sur la même page afficheront le même titre. Une interface
+musicale est faite de listes d'éléments distincts ; c'est probablement le pire cas d'usage possible
+pour un système où la donnée est globale au document. Produire les parts avant C1 revient à
+préparer exactement la découverte désagréable que le KANBAN annonce à propos des trois cents
+composants de Death Stranding.
+
+---
+
+## Résumé en une page
+
+Un thème est un dossier de quatre fichiers dans `src/`, compilé par un script vers un gabarit HTML
+plat que le registre découvre par son nom seul, pour que le catalogue tienne à mille vingt-quatre.
+Une part est un fragment à trois zones — en-tête JSON de cinq clefs, styles, markup gabarité — que
+deux consommateurs remplissent différemment : le script avec un échantillon, l'éditeur avec les
+données du brief. Il y en a 162 sur disque, réparties en cinq listes de presse identiques et une
+liste de jeu autonome. Aucune ne peut aujourd'hui déclarer de champ éditable, et c'est la carte C1,
+déclarée bloquante. Pour un thème Spotify, tout le moteur d'accueil et toute la méthode se
+reprennent tels quels ; les parts, les tokens, la home d'exemple et deux lignes d'import de
+`componentCatalog.js` sont à produire ou à toucher, et le travail n'a de sens qu'après C1.

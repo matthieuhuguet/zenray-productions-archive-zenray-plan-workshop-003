@@ -1,0 +1,18 @@
+// POINT D'ENTRÉE CLOUDFLARE PAGES — l'équivalent de `api/[...route].js` côté Vercel.
+//
+// Il ne fait que deux choses, et c'est voulu : installer l'hôte courant, puis déléguer. Toute la
+// traduction `Request`/`Response` vers `req`/`res` vit dans `server/_cloudflare-adapter.js`, où
+// elle se teste sans charger les quarante-quatre handlers.
+import { setPlatform, cloudflarePlatform } from '../../server/_platform.js'
+import { adapterHandlerNode } from '../../server/_cloudflare-adapter.js'
+import routeur from '../../api/[...route].js'
+
+export function onRequest(context) {
+  // L'environnement du Worker n'est disponible qu'ici : un Worker le reçoit en argument et n'a
+  // aucun global où le prendre. `process.env` est peuplé automatiquement par
+  // `nodejs_compat_populate_process_env`, donc les handlers continuent de le lire directement ;
+  // seul `readAsset` a besoin de `env`, pour joindre le service d'assets.
+  setPlatform(cloudflarePlatform(context.env))
+  // `context.params.route` porte les segments après /api/ (tableau, fichier `[[route]].js`).
+  return adapterHandlerNode(routeur, context.request, context.waitUntil?.bind(context), context.params)
+}

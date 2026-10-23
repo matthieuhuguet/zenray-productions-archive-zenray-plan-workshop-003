@@ -1,0 +1,174 @@
+# Attaque de la conception 05 à 07, angle unique : ce qu'elle réinvente
+
+## Ce que j'ai lu, et ce que je n'ai pas lu
+
+Lus en entier de ma main pour ce document : `src/zenraymedia/cut.js` (230 lignes), `composition.js` (156), `compile.js` (352), `formats.js` (105), `forge.js` (133), `critic.js` (254), `exporters.js` (202), `contracts.js` (187), `componentCatalog.js` (55), `htmlTemplate.js` (117), `media.css` (371), `MediaApp.jsx` (1158, en deux passes), `docs/zenraymedia/KANBAN.md` (111), `src/config/colors.js` (111). Lus par extraits mesurés : `document.js` L1 à L80, `themes/registry.js` L100 à L175, `src/fonts.css` L125 à L185, `scripts/zrm-build-theme.mjs` L1 à L120 et L180 à L220 et L355 à L375, `src/components/Icon.jsx` L1 à L14 et L176 à L190, `themes/T-04-1-1--revelation-cinematique/parts/01-title-screen.html`.
+
+Non ouverts : `declensions.js`, `publish.js`, `store.js`, `fonts.js`, `taxonomy.js`, les tests. Quand je m'appuie sur eux, je le dis dans la phrase.
+
+Les comptes de lignes et d'occurrences ci-dessous viennent de `wc`, de `grep -c` ou d'une lecture ligne à ligne ; aucun n'est estimé. Les rares raisonnements sur le comportement d'un navigateur sont signalés comme des hypothèses, parce que je ne les ai pas exécutés.
+
+---
+
+## 1. La timeline réinvente `cut.js`, qui est déjà la partition temporelle du produit
+
+**Le défaut.** Le document 06 ouvre sur un constat qui commande tout le reste, « aucune piste, aucun keyframe, aucune durée éditable, aucun champ sérialisé décrivant un mouvement », puis propose une structure `timeline: { v, duration, fps, loop, poster }` posée sur la composition. Or la moitié de ce constat est fausse et la structure proposée duplique trois valeurs qui existent, sont validées et sont déjà consommées par la Forge.
+
+**La preuve.** Un vocabulaire de tempo est déclaré en dur dans le contrat, `contracts.js` L12, `BEAT_TEMPOS = ['still', 'calm', 'drive', 'snap']`, et il est validé bloc par bloc à la L95. Chaque beat porte son tempo depuis `cut.js` L71 et L95, ainsi qu'un poids d'accent calculé en L65 à L69. La durée en découle par une table explicite, `formats.js` L99, `TEMPO_BASE = { still: 4, calm: 3, drive: 2, snap: 1.2 }`, que `beatDuration` L101 module par le poids ; `durationOf` L91 à L96 en fait la somme et la borne par `format.time.min` et `format.time.max`. Cette durée n'est pas théorique : `compile.js` L187 écrit déjà `data-duration="${beatDuration(beat)}"` sur chaque section rendue, `MediaApp.jsx` L784 l'affiche à côté de chaque bloc dans l'éditeur, et `critic.js` L118 à L122 refuse déjà un livrable dont la durée touche le plafond du format. Quant à `fps`, il est posé par format, `formats.js` L59 pour la vidéo et L68 pour l'habillage alpha, rendu obligatoire par `contracts.js` L139, et lu par `forge.js` L46 pour cadencer l'horloge virtuelle. Enfin, une piste sonore existe en modèle : `cut.js` L103 pose `audio: { bed: null, cues: [] }` et `themes/registry.js` L136 pose `sound: { bed, bedLufs, cues, allowed }`. Le document 06 ne cite aucune de ces lignes et propose une piste « son » en couleur neuve.
+
+**La correction.** Garder `anim` sur l'item, qui est le seul ajout réellement neuf et qui survit sans toucher `document.js`, l'analyse du document 06 étant juste sur ce point : `composition.js` L25 à L30 reconstruit chaque item par `{ hidden: false, locked: false, props: {}, ...item }`, donc l'étalement conserve tout champ inconnu. En revanche, supprimer `timeline` en tant qu'objet : `fps` se lit dans `format.time.fps`, `duration` s'obtient par `durationOf(cut, format)`, et la piste sonore se pose dans `cut.audio.cues`, qui l'attend depuis le premier jour. Le seul champ qui n'a pas de foyer est `poster`, et un seul nombre ne justifie pas une structure parallèle : il tient dans le cut, que `document.js` L57 sérialise déjà tel quel et que `fromDocument` L77 relit sans le filtrer. Bénéfice mesurable : les trois lignes à ajouter dans `normalizeComposition` deviennent zéro ligne, et il n'existe jamais deux vérités sur le nombre d'images par seconde.
+
+---
+
+## 2. `UI.blue` n'est pas la couleur de cette interface, et `media.css` ne peut pas l'importer
+
+**Le défaut.** Les documents 05 et 06 prennent un engagement identique, sortir le bleu du dur en lisant `UI.blue` depuis `src/config/colors.js`. L'engagement est irréalisable tel qu'écrit, et s'il était forcé il changerait visiblement la teinte à l'écran tout en se présentant comme un simple rangement.
+
+**La preuve.** D'abord la mécanique : `media.css` est une feuille de style statique, elle n'a aucun moyen d'importer un module JavaScript, et `src/config/colors.js` est bien un module ISOMORPHE de chaînes et de fonctions pures, comme son en-tête le dit L21. Ensuite le fond : le système de jetons de cet éditeur n'est pas `colors.js`, c'est `--g9-*`, défini dans `src/fonts.css` L134 à L157, `--g9-fg`, `--g9-bg`, `--g9-muted`, `--g9-soft`, `--g9-rail`, `--g9-rim-main`, `--g9-rim-soft`, `--g9-elev-a`, `--g9-timing`, `--g9-ease`, avec sa contrepartie sombre L159 à L177. `media.css` le déclare lui-même dès son en-tête, L4 : « tokens `--g9-*` du projet, courbe unique `--g9-ease` ». Enfin la valeur : `colors.js` L39 à L47 pose sept couleurs qui sont la palette d'ÉTIQUETTES macOS de Create, et `UI.blue` y vaut `#4295f7`, non `#0a84ff`. Le même fichier prévient L34 à L36 que ces clefs sont écrites dans les données des étiquettes déjà posées. Détourner cette palette vers l'accent de l'éditeur mélange deux registres et déplace la teinte.
+
+Sur le comptage, l'affirmation « `#0a84ff` revient une quinzaine de fois » est basse et surtout incomplète : `grep -o '#0a84ff' src/zenraymedia/media.css | wc -l` rend **17**, auxquels s'ajoutent **5** occurrences de la forme `rgba(10,132,255,…)`. Or ces cinq-là sont précisément celles qui portent la lueur du repère de dépôt, `media.css` L219 et L224, `box-shadow:0 0 9px rgba(10,132,255,.7)`, c'est-à-dire l'acquis que le document 05 déclare vouloir protéger en premier. Une substitution qui ne viserait que la forme hexadécimale laisserait le halo à l'ancien bleu, à côté d'une barre repeinte au nouveau.
+
+**La correction.** Ajouter deux jetons au `:root` de `src/fonts.css`, un accent et sa lueur, à côté de `--g9-ease` L153, puis remplacer les 22 occurrences de `media.css` par ces jetons. La règle du projet est alors tenue au sens strict, une couleur d'interface ne s'écrit qu'à un seul endroit, et cet endroit est celui que le reste de l'application utilise déjà. `colors.js` reste ce qu'il est, la palette des étiquettes.
+
+---
+
+## 3. Les trente courbes et les sept durées réinventent `--g9-ease`, `--g9-timing` et `theme.motion`
+
+**Le défaut.** Le document 06 §3 crée un fichier neuf `src/zenraymedia/easings.js` portant trente courbes, et §4 une palette de sept durées de 0,05 à 0,35 seconde, sans mentionner que le projet possède déjà une courbe canonique et une durée canonique, ni que le contrat de thème porte depuis l'origine un groupe `motion` fait pour cela.
+
+**La preuve.** `src/fonts.css` L152 et L153 posent `--g9-timing: 0.35s` et `--g9-ease: cubic-bezier(.16,1,.3,1)`, avec un commentaire L124 qui les rattache explicitement au « Fast interaction range » du design du projet. Cette valeur est exactement l'`easeOutExpo` que le document 06 liste lui-même, `(0.16,1,0.3,1)`, et exactement le défaut posé par `themes/registry.js` L133, `motion: { enabled: false, ease: 'cubic-bezier(.16,1,.3,1)', enter: 0, stagger: 0, cut: 'none' }`. Le groupe `motion` est l'un des sept groupes déclarés du contrat de thème, `contracts.js` L106, et il est consommé : `compile.js` L117 en tire la variable `--zrm-ease`, L164 à L169 en tire une animation d'entrée pilotée par `enter` et `stagger`. Le champ `cut`, lui, est déclaré et n'est lu nulle part, ce que le document 06 ne relève pas alors qu'il décrit précisément un système de coupes.
+
+**La correction.** Le catalogue de courbes garde sa légitimité, mais pour la PAGE COMPILÉE seulement, et il se branche sur `theme.motion.ease` qui est déjà le point d'entrée, avec la courbe de `registry.js` L133 comme défaut au lieu d'un défaut neuf. Les sept durées, elles, ne sont pas un besoin démontré : `theme.motion.enter` et `theme.motion.stagger` existent, sont en millisecondes, et sont déjà affichés à l'écran dans la fiche du thème, `MediaApp.jsx` L997. Si une palette fermée de durées se justifie, elle se pose là, pas dans un module parallèle. Et `motion.cut`, champ mort, est le crochet naturel du système de coupes du §5.
+
+---
+
+## 4. La carte C6 est déjà faite, et la conception la traite comme à faire
+
+**Le défaut.** Le tableau porte en colonne À FAIRE une carte dont le critère de fini est satisfait dans le code depuis longtemps. Aucun des trois documents ne le dit, et le document 05 va jusqu'à citer la ligne exacte de la fonctionnalité livrée sans en tirer la conséquence.
+
+**La preuve.** `KANBAN.md` L87 à L90 : « C6 · Les zones de sécurité visibles. `formats.js` connaît `safe` pour les sept formats ; l'aperçu ne l'expose pas. Fini quand : en 9:16, le cache de sécurité se montre et se cache d'un bouton. » Or `MediaApp.jsx` L841 à L845 est ce bouton, conditionné par `format.safe` et basculant l'état `showSafe` déclaré L92 ; L865 à L872 dessinent les quatre bandes, mises à l'échelle par `fitScale` ; `media.css` L131 à L135 les stylent ; et une commande de palette existe en plus, L442, `cmd-safe`. Le format 9:16 déclare bien ses zones, `formats.js` L45, `safe: { top: 220, bottom: 320, sides: 64 }`. Le document 05 §2 cite le bouton, qu'il situe L840 pour un réel L842, mais seulement pour proposer de le déplacer dans une zone Outils rapides.
+
+**La correction.** Fermer C6 sur le tableau avant d'écrire une ligne de plus, avec la mention des lignes ci-dessus comme preuve. Une carte ouverte sur du code livré finit toujours par se faire réimplémenter par quelqu'un qui fait confiance au tableau plutôt qu'au fichier.
+
+---
+
+## 5. Le dépôt dans l'aperçu : `placementAt` est déjà invariant d'échelle, et le multiplier le casserait
+
+**Le défaut.** Le document 05 §4 prend un engagement vérifiable qui contient son propre bogue : l'aperçu « doit appeler `placementAt` sans la modifier et multiplier les coordonnées par `fitScale` ». La première moitié est juste, la seconde introduit exactement l'erreur que la première cherche à éviter.
+
+**La preuve.** `MediaApp.jsx` L594 à L601 : `placementAt` prend `event.currentTarget.getBoundingClientRect()`, puis calcule `x = (event.clientX - box.left) / Math.max(1, box.width)` et le symétrique en `y`, avant de comparer à 0,25, 0,75 et 0,5. La fonction ne travaille donc que sur des RAPPORTS, et un facteur d'échelle commun au point et à la boîte s'annule au numérateur et au dénominateur. Multiplier les coordonnées par `fitScale` sans toucher à la boîte décalerait toutes les frontières, et le bord haut cesserait de tomber au quart de la hauteur. À vérifier en une ligne de test, sans navigateur : le placement rendu pour un point donné doit être identique quelle que soit la taille de la boîte.
+
+Second point, celui-là présenté comme une hypothèse parce que je ne l'ai pas exécuté. L'aperçu est une `iframe` en `srcDoc`, `MediaApp.jsx` L857 à L864, avec `sandbox="allow-same-origin"` et sans `allow-scripts`. Il est très probable qu'aucun événement de survol ni de dépôt émis au-dessus de cette iframe n'atteigne le document parent, donc que l'accroche du glisser ne puisse pas se faire sur l'iframe elle-même. Si c'est le cas, aucun appel à `placementAt` ne sera jamais déclenché par ce chemin.
+
+**La correction.** Appeler `placementAt` sur l'élément de la zone de dépôt, sans aucune conversion. Et pour capter le geste, réutiliser la pièce qui résout déjà ce problème dans le même panneau : `.zrm-safe-overlay`, `media.css` L131, un calque en `position:absolute; inset:0` posé au-dessus de l'iframe et rendu inerte par `pointer-events:none`, dont `MediaApp.jsx` L866 à L871 montre déjà comment positionner des repères avec le même `* fitScale`. Un calque frère, cette fois recevant les événements, résout la capture sans toucher au calcul.
+
+---
+
+## 6. `freezeAt` réinvente l'horloge virtuelle de la Forge, au moins pour le PDF
+
+**Le défaut.** Le document 06 §5 conçoit un drapeau `freezeAt` passé à `compile()`, qui n'émet aucune règle `@keyframes` et écrit les valeurs interpolées en style en ligne, et l'applique à l'export PNG comme à l'export PDF. Le projet possède déjà un mécanisme de gel à un instant choisi, écrit, commenté et adossé à une garantie de reproductibilité.
+
+**La preuve.** `forge.js` L81 à L86 : `await page.evaluate(() => { for (const a of document.getAnimations()) { a.pause() } })`, puis, image par image, `a.currentTime = ms`. Le commentaire L41 à L43 en fait la règle d'or, « aucune capture ne dépend de l'horloge réelle, donc deux exécutions produisent le même fichier ». Le document 06 le cite d'ailleurs correctement au §0 et au §2, où il propose justement de réutiliser `getAnimations()` pour la lecture de l'aperçu, puis l'oublie au §5. Or l'export PDF n'a pas besoin d'autre chose : `exporters.js` L161 à L177 monte une vraie `iframe` et appelle `frame.contentWindow.print()` après `fonts.ready` ; le document y est un document réel, donc `contentDocument.getAnimations()` y est atteignable, exactement comme dans la Forge. Seul l'export PNG est un cas à part, parce que `exportPng` L111 à L157 sérialise un `foreignObject` chargé comme image, et l'inférence du document 06 sur ce point me paraît juste.
+
+**La correction.** Réserver le chemin neuf au seul export PNG, et geler le PDF par les deux lignes de `forge.js`, insérées dans `exportPdf` entre `fonts.ready` L171 et l'appel à `print()` L174. Un mécanisme de gel au lieu de deux, et le PDF sort alors de la même horloge que la vidéo.
+
+---
+
+## 7. Le format se change déjà à trois endroits, la zone Outils rapides en ferait un quatrième
+
+**Le défaut.** Le document 05 §2 propose de regrouper le sélecteur de format dans une zone Outils rapides, en qualifiant l'opération de « déplacement de JSX ». Ce serait un déplacement s'il n'existait qu'une commande de format ; il en existe trois.
+
+**La preuve.** Premièrement les pastilles, `MediaApp.jsx` L1135 à L1141, une par entrée de `FORMATS` (le document 05 les situe « L1141 à L1147 », ce qui désigne en réalité la fermeture du bloc puis les boutons d'export). Deuxièmement l'arbre des déclinaisons, L938 et L939, où chaque branche est un bouton qui appelle `setFormatId` en portant en plus l'état réel du format, blocs montrés, durée, nombre de défauts. Troisièmement la palette de commandes, L455, `for (const f of FORMATS) list.push({ id: 'fmt-' + f.id, … })`.
+
+**La correction.** Choisir, au lieu d'ajouter. L'onglet Sorties est strictement plus informatif que la rangée de pastilles, puisqu'il rend le même geste en disant ce qu'il coûte ; les pastilles nues sont donc le doublon à retirer, et la zone Outils rapides n'a pas à recevoir un quatrième exemplaire.
+
+---
+
+## 8. Le verdict du Critique est déjà affiché deux fois
+
+**Le défaut.** Le document 05 §8 veut rapatrier le verdict du Critique dans la barre du bas, « aujourd'hui dans le Deck ». Il y est, et il est aussi ailleurs.
+
+**La preuve.** `critic.js` L249 à L254 pose `summarize`, unique calculateur de verdict. `MediaApp.jsx` L1006 à L1011 l'affiche dans l'onglet Critique. Et l'onglet Sorties en affiche un second, dérivé de `declensionSummary`, L922 à L926, avec le même code couleur et la même sémantique de blocage. Une troisième copie dans la barre du bas ferait trois surfaces à tenir cohérentes. Au passage, l'inquiétude sous-jacente est déjà couverte : l'export passe sous garde-fou sans exception, `runExport` L290 à L293, et la publication aussi, `publishNow` L412 à L416, cette dernière basculant même l'onglet sur le Critique.
+
+**La correction.** Ne pas recopier le verdict, mais reprendre le geste déjà écrit L291, un message qui nomme le nombre de défauts et renvoie vers l'onglet. Si un témoin permanent est jugé nécessaire en bas, qu'il soit une pastille de comptage identique à celle de l'onglet Critique, L883, `deckTab === 'critic' && issues.length`, et rien de plus.
+
+---
+
+## 9. Le grain du thème de streaming existe en jeton de thème depuis l'origine
+
+**Le défaut.** Le document 07 §3 décrit la texture des dégradés comme un empilement à composer dans le markup de la part, rampe, lueur radiale et grain. Le grain et la vignette sont des jetons de thème déjà écrits et déjà compilés.
+
+**La preuve.** `compile.js` L128 émet, quand `theme.surface.grain > 0`, un `body::after` en `mix-blend-mode: overlay` dont l'image est un `feTurbulence` en `data:image/svg+xml`, d'opacité pilotée par la valeur du thème ; L129 fait de même pour `body::before` et `surface.vignette` en dégradé radial. `themes/registry.js` L130 déclare ces deux champs dans la coquille par défaut, `grain: 0, vignette: 0`. Le même motif de grain est d'ailleurs employé pour le verre de l'éditeur, `media.css` L42.
+
+La nuance, et elle sauve à moitié le document 07 : ces deux lignes appartiennent à `themeCss`, donc à la voie « thème à tokens ». La voie Lego, `composedPage` L237 à L256, ne les reprend pas. Sur un thème à composants, le grain manque donc réellement.
+
+**La correction.** Reporter les deux lignes de `compile.js` L128 et L129 dans la feuille de `composedPage`, pilotées par `theme.surface.grain` et `theme.surface.vignette`. Un grain par THÈME, réglable en un nombre, plutôt qu'un grain recopié dans chaque part, avec le bénéfice secondaire que le garde-fou de `zrm-build-theme.mjs` L365, qui refuse tout `https?://` dans un gabarit, ne s'applique pas à une chaîne construite par le compilateur. Le document 07 a raison sur le piège, il se trompe sur l'endroit où l'éviter.
+
+---
+
+## 10. Les icônes : le compte est faux, et il est donné comme mesuré
+
+**Le défaut.** Le document 07 §5 annonce « `src/components/Icon.jsx` (207 lignes, 91 clefs du dictionnaire `P` comptées une à une) ». Le fichier fait **206** lignes et `P`, qui court de L7 à L182, porte **94** clefs. La conclusion pratique, recopier les tracés en `<symbol>` faute de pouvoir importer `P`, reste juste ; c'est la mesure qui ne tient pas, dans un document dont c'est la seule mesure vérifiable.
+
+**La preuve.** `wc -l src/components/Icon.jsx` rend 206. `sed -n '7,182p' … | grep -cE "^  '[^']+':"` rend 94. Deux précisions sur l'importabilité : `P` n'est en effet pas exporté, mais `isSymbol` l'est, L188, `Object.prototype.hasOwnProperty.call(P, n)`, ce qui permet de tester l'existence d'un glyphe depuis l'extérieur sans le recopier ; et `BLUE_GRAD` L184 fournit déjà le dégradé bleu partagé, utile si la planche `00-icons.html` doit porter un glyphe en dégradé.
+
+**La correction.** Reprendre le compte avant de dimensionner la planche, et écrire la commande qui l'a produit à côté du chiffre, comme le fait `colors.js` pour ses sept valeurs échantillonnées.
+
+---
+
+## 11. Le zoom manuel ne peut pas « n'écrire que dans `fitScale` »
+
+**Le défaut.** Le document 05 pose en engagement vérifiable que « le zoom manuel n'écrit que dans `fitScale` ». L'intention est bonne, elle protège `contentScale`, mais `fitScale` n'est pas une valeur inscriptible.
+
+**La preuve.** `useFitScale`, `MediaApp.jsx` L54 à L72, tient son état en interne, le recalcule dans `measure()` à chaque déclenchement d'un `ResizeObserver` L67, et n'expose aucun passeur : `MediaApp.jsx` L270 se contente de déstructurer `{ scale: fitScale, availH }`. Toute écriture serait écrasée au premier redimensionnement du panneau. Le commentaire L107 à L111 est par ailleurs sans ambiguïté sur la raison de la prudence, la confusion entre les deux échelles a déjà été attrapée une fois.
+
+**La correction.** Introduire un multiplicateur d'affichage distinct, appliqué au produit là où `fitScale` est consommé, `MediaApp.jsx` L856 pour la boîte et L863 pour la transformation de l'iframe, sans toucher ni au hook ni à `contentScale`. L'engagement se reformule alors en une phrase testable : le zoom manuel ne fait varier aucune valeur envoyée à `compile()`.
+
+---
+
+## 12. `props.fit` est déjà écrit et déjà mort, et le document 05 le laisse dans l'angle mort
+
+**Le défaut.** Le document 05 §5 désigne `ratio` et `radius` comme « les deux premiers champs à câbler puisqu'ils n'attendent qu'une saisie ». C'est exact, mais il y a un troisième champ déjà écrit dans le modèle, et lui est cassé, ce qui en fait le candidat le plus urgent et non le plus lointain.
+
+**La preuve.** `composition.js` L71 pose sur toute image `props: { fit: 'cover', radius: 18, ratio: '16 / 9' }`. `compile.js` L214 lit bien `item.props?.ratio` et `item.props?.radius` et les injecte en propriétés personnalisées. `fit`, lui, n'est lu nulle part : `grep -rn "props.fit" src/` ne rend aucune occurrence, et `compile.js` L248 fige `object-fit:cover` dans la feuille commune. Un réglage existe donc dans les données, se sérialise, se recharge, et ne produit aucun effet.
+
+**La correction.** Le panneau Détails de C1 câble les trois champs d'un coup, et `compile.js` L248 passe de `object-fit:cover` à une variable alimentée en L214 comme le sont déjà le ratio et le rayon. Coût nul, et cela retire du modèle un champ qui ment.
+
+---
+
+## 13. `import.meta.glob` est déjà le motif du fichier, deux lignes plus bas
+
+**Le défaut.** Le document 07 §6 présente comme une alternative à explorer le fait de « basculer ce chargement sur `import.meta.glob` ». Ce n'est pas une alternative, c'est déjà la façon dont le même fichier charge tout le reste.
+
+**La preuve.** `componentCatalog.js` L12 et L13 : `const registries = import.meta.glob('./themes/*/component-registry.json', …)` et `const parts = import.meta.glob('./themes/*/parts/*.html', …)`. Seules les feuilles de jetons sont importées statiquement, L5 à L10, puis indexées à la main L14 à L21. Le diagnostic du document 07 est juste, un septième thème s'afficherait sans couleurs, mais la solution est déjà écrite immédiatement en dessous du problème.
+
+**La correction.** Aligner les jetons sur le motif des deux autres ressources, et supprimer la table indexée à la main, qui est la seule liste du fichier à devoir être tenue à jour par un humain.
+
+---
+
+## 14. Dérive des références de ligne, à corriger avant que quelqu'un s'y fie
+
+Ces écarts ne changent aucune conclusion, mais un document dont l'autorité repose sur la citation ligne à ligne doit être exact, faute de quoi la prochaine lecture ouvrira le mauvais bloc et conclura que la conception invente.
+
+| Écrit dans 05 ou 07 | Réel, vérifié |
+|---|---|
+| pastilles de format, `L1141 à L1147` | `MediaApp.jsx` L1135 à L1141 |
+| `footer.zrm-render`, `L1140 à L1156` | L1134 à L1152 |
+| bouton `renderDark`, `L836` | L838 |
+| bouton `showSafe`, `L840` | L842 |
+| charge utile composant, `L1123` | L1120 |
+| charge utile image, `L1096` | L1098 |
+| relecture des charges utiles, `L613 et L614` | L614 et L615 |
+| `useFitScale`, `L50 à L70` | L54 à L72 |
+| `Icon.jsx`, 207 lignes, 91 clefs | 206 lignes, 94 clefs |
+| `#0a84ff`, « une quinzaine » | 17, plus 5 en `rgba(10,132,255,…)` |
+
+Exactes en revanche, et il faut le dire aussi : `placementAt` L594, `PLACEMENTS` L9, les quatre règles `data-drop` L218 à L227, `patchItem` L134 appelé aux seules L733 et L734, `insertItem` L88, `locate` L76, la grille `minmax(min(100%,112px),1fr)` L197, `data-panes="three"` en dur L647 alors que les deux replis existent L21 et L22, `data-zrm-instance` écrit L214 et L227, l'anti-rebond de 220 ms L219, `onFrameLoad` L243 à L268, `document.js` L57, les sept clefs du registre de `zrm-build-theme.mjs` L194 à L202, le garde-fou `https?://` L365, `motion` parmi les sept groupes `contracts.js` L106, le défaut de `motion` `registry.js` L133, `exportPng` `exporters.js` L111 à L157, la pause et le `currentTime` de `forge.js` L82 et L86, et le chargement statique des six jetons `componentCatalog.js` L5 à L21.
+
+---
+
+## Ce que la conception voit juste, et qu'il ne faut pas jeter avec le reste
+
+Trois constats tiennent à la vérification et méritent d'être gardés tels quels. La survie de `anim` par l'étalement de `composition.js` L25 à L30 est exacte. Le diagnostic de C1 est exact et il est même sous-estimé : `grep -rn "\.props" src/zenraymedia/` hors tests ne rend qu'une seule ligne, `compile.js` L214, donc aucun composant, jamais, ne lit ses propres valeurs. Et l'hypothèse sur `exportPng` est bien posée comme une hypothèse alors qu'elle est probablement vraie, ce qui est la bonne façon d'écrire ce qu'on n'a pas mesuré.
+
+Le fil commun des quatorze points ci-dessus tient en une phrase, et c'est la seule que je me permette : à chaque fois qu'un des trois documents décrit une pièce comme absente, elle existe, mais sur l'autre voie de compilation, dans l'autre couche de jetons, ou sur la carte voisine du tableau. Le réflexe qui manque n'est pas de lire davantage de code, c'est de chercher la pièce sous son autre nom.

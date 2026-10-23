@@ -1,0 +1,674 @@
+# Audit du code, de l'architecture et des données
+
+## Architecture observée
+
+| Zone | Fichiers principaux | Responsabilité actuelle | Observation |
+|---|---|---|---|
+| Interface et orchestration | `MediaApp.jsx`, `media.css` | Presque tous les états, gestes, panneaux, commandes et parcours | `MediaApp.jsx` atteint 3 589 lignes et des dizaines d'états React forment un point de couplage unique |
+| Modèle de scène | `composition.js`, `layers.js`, `nodes.js` | Lignes Lego, calques absolus, groupes, slides, overrides DOM | Trois modèles se superposent sans identité commune de page ou de nœud |
+| Compilation | `compile.js`, `htmlTemplate.js`, `cut.js` | Transforme brief, Cut, thème et composition en HTML | Trois voies de rendu coexistent : thème brut, Lego, layers |
+| Contrats | `contracts.js`, `formats.js`, `declensions.js` | Brief, formats, graines, contrôles de base, arbre de sorties | Les 27 formats ne sont pas tous présents dans l'arbre des déclinaisons |
+| Persistance | `store.js`, `document.js`, `CreateBrowser.jsx` | `localStorage`, documents `.zmedia.json`, navigation Create | Deux sources de vérité et aucune notion explicite de document sale ou récupérable |
+| Sortie | `exporters.js`, `forge.js`, `publish.js` | HTML/PNG/PDF, plan de commande vidéo, page Markdown Create | Les artefacts ne partagent ni job, ni preuve, ni reçu, ni galerie |
+| Contrôle | `critic.js` | Contrôles statiques et mesures du DOM rendu | La plupart des règles connaissent l'ancien Cut et des sélecteurs fixes, pas toute la scène |
+| Thèmes | `themes/registry.js`, `componentCatalog.js`, `themeFonts.js` | Chargement, métadonnées, composants et polices | Plusieurs contrats de thème parallèles rendent l'index fragile |
+
+Le code possède de bonnes qualités : les fonctions de géométrie restent souvent pures, les données
+sont normalisées en lecture, les identifiants sont déterministes, le HTML exporté peut embarquer
+ses polices, les tests capturent de vrais bogues et les changements récents restent chirurgicaux.
+Le risque vient moins d'une absence de soin local que d'un modèle global qui a grandi par couches.
+
+## Risques P0
+
+| Risque | Preuve | Effet utilisateur | Porte de résolution |
+|---|---|---|---|
+| Fichier Create associé au mauvais projet | `docPath`, `docSha` et `published` sont trois états globaux de `MediaApp`, que nouveau, dupliquer, supprimer et changer de projet ne réinitialisent pas | Après avoir changé de projet, `⌘S` peut réécrire le fichier du projet précédent avec le SHA précédent ; le reçu affiché peut appartenir à un autre projet | L'association document, révision et publication appartient au projet ; test E2E A enregistré, B créé, `⌘S`, puis A rouvert intact |
+| Contexte d'édition conservé entre deux projets | `themeId`, `formatId`, sélection, nœud choisi et verrou du panneau vivent au niveau de `MediaApp` ; choisir un projet local ne restaure aucun de ces états | Le titre passe à B tandis que thème, format ou inspecteur restent ceux de A ; une commande peut viser un objet qui n'existe pas dans le projet affiché | Changer de projet applique un contexte atomique validé, ou distingue explicitement les préférences globales des données propres au document |
+| Collision d'identifiants après suppression | Nouveau et Dupliquer fabriquent leurs identifiants avec `list.length` comme compteur déterministe | Supprimer un projet intermédiaire puis en créer un peut recréer l'identifiant d'un projet encore présent ; sélection et mise à jour touchent alors plusieurs entrées ou la mauvaise | Identifiant unique indépendant de la taille ; contrainte d'unicité au chargement et test suppression, création, duplication |
+| Changement de format destructif | `MediaApp.jsx` appelle `applyConstraintsToAll` et réécrit les coordonnées | Revenir au premier format peut dériver ; une déclinaison détruit la source qui devait la générer | Aller-retour A vers B vers A identique à l'octet ; overrides par format séparés |
+| Historique par événement de pointeur | chaque déplacement appelle `patchComposition`, qui pousse un état et persiste les projets | Un seul glisser consomme les 50 états, écrit plusieurs fois le document et rend Annuler imprévisible | Un `pointerdown` ouvre une transaction, `pointerup` la ferme en une entrée |
+| Pages incomplètes | une slide est un groupe de calques ; les lignes Lego restent globales | Le carrousel ne possède pas des pages autonomes et ne peut pas sortir en lot fidèle | Chaque objet appartient explicitement à une page ou au masque ; dix pages donnent dix rendus |
+| Connecteur Miro hors page et rendu comme rectangle | `createConnector` appelle directement `addLayer`, donc laisse `groupId` vide ; le wrapper conserve `.zrm-layer-shape`, dont le CSS pose un fond accent | La ligne devient un masque visible sur toutes les diapositives et sa boîte englobante est un rectangle coloré derrière le SVG ; après suppression d'un bout, elle devient entièrement une forme | Une relation appartient à la même page que ses extrémités, refuse les pages différentes et possède un rendu sans fond ; tests DOM, pixels, copie, duplication et suppression |
+| Groupe de diapositive destructible comme un groupe ordinaire | la hiérarchie expose le groupe support de chaque slide avec Grouper, Dissoudre, Supprimer et Auto Layout | Grouper ses calques les retire de la slide ; dissoudre ou supprimer le groupe invalide la slide, dont `readSlides` efface alors la description à la lecture | Distinguer page, groupe utilisateur et masque ; interdire les commandes de groupe sur le conteneur système durant la migration |
+| Collage transformé en masque global | `collerSelection` retire toujours `groupId` puis appelle `addLayer`, sans rattachement à la slide active | Un objet copié depuis ou vers une diapositive apparaît sur toutes les pages ; un connecteur collé vise encore les IDs originaux | Collage conscient de la page et remapping en deux passes de toutes les références internes |
+| Navigation enregistrée comme contenu | activer une slide passe par `patchComposition`, donc historique, Auto Layout et persistance | Parcourir les pages consomme Annuler et marque implicitement le document comme modifié | Séparer `activePageId` de la scène ; l'export reçoit le pageId explicitement |
+| Sélection et manipulation d'objets invisibles | la surcouche filtre `!layer.hidden`, alors que le compilateur utilise `isEffectivelyHidden` | Une autre diapositive ou un groupe masqué garde une boîte, entre dans le marquee et aimante le geste | Une seule fonction de visibilité gouverne rendu, sélection, snapping, compte et clavier |
+| Pont d'iframe contradictoire | `compile.js` injecte un script interactif ; l'iframe porte `sandbox="allow-same-origin"` sans `allow-scripts` | Le navigateur doit bloquer le script de sélection ; les tests jsdom ne le prouvent pas | Test Playwright du clic ; choisir ensuite un pont sans script ou un sandbox réellement isolé |
+| Thème HTML exécuté dans l'origine de l'application au PDF | `exportPdf` charge le HTML compilé dans un `srcdoc` sans sandbox ; `loadTheme` ne refuse pas les scripts | Un paquet de thème futur peut exécuter du JavaScript, lire le parent et agir avec les droits de l'application au clic sur PDF | Valider le paquet, interdire le script par défaut et isoler toute phase de rendu dans une origine ou un processus sans droits applicatifs |
+| Publication sans média | `publishArticle` écrit le Cut en Markdown ; `publishNow` l'appelle malgré la composition visible | « Publier » ne publie pas le post ou le carrousel que l'utilisateur vient de créer | Le reçu de publication référence les artefacts composés et leur manifeste |
+| Export non prouvé | PNG via `foreignObject`, PDF via boîte d'impression, vidéo via commande affichée | Le bouton peut réussir sans livrable fidèle, conforme ou récupérable | Tests d'artefacts réels : dimensions, pixels, poids, alpha, pages, codec et police |
+| Absence de migration | `ZMEDIA_VERSION = 2`, mais `fromDocument` tolère sans migration et `toDocument` omet les champs inconnus | Une version future peut être lue puis réenregistrée en perdant silencieusement ses données | Migrations pures version par version et refus d'écriture si la version est plus récente |
+| Échec local silencieux | `store.js::write` retourne `false`, mais les appels de `saveProjects` ne contrôlent pas ce résultat | Le quota ou une erreur JSON peut perdre le travail sans message ; les images résolues en data URL rendent ce cas plausible | Provoquer un quota dépassé, afficher l'échec, garder le brouillon en mémoire et proposer une sauvegarde Create |
+| Cut construit avec l'ancien thème | le chargement asynchrone change `themeId` sans vider immédiatement `theme` ; l'effet qui construit un Cut teste seulement que `theme` existe | Ouvrir un document Create sans Cut avec un autre thème peut figer la partition selon les bornes et choix du thème précédent | Porter `{id, value, status}` dans l'état chargé et construire seulement si `loadedTheme.id === themeId` ; test d'ouverture lente A vers B |
+
+### Pont de prévisualisation
+
+Le correctif ne consiste pas à ajouter naïvement `allow-scripts` au sandbox. Avec
+`allow-same-origin`, le contenu devient alors suffisamment puissant pour toucher son parent si une
+future part HTML contient du script. Deux chemins sûrs existent :
+
+1. garder un aperçu sans script et attacher les écouteurs depuis le parent au `contentDocument`
+   après chaque chargement, puisque le document reste accessible ;
+2. isoler l'iframe dans une origine opaque avec `allow-scripts` sans `allow-same-origin`, puis
+   valider strictement `event.source`, le schéma du message et la liste des actions.
+
+Le premier chemin préserve aussi l'invariant selon lequel un HTML exporté reste sans pont
+d'édition. Il paraît donc le plus simple, sous réserve d'un test réel Chrome et Safari.
+
+## Un modèle canonique manquant
+
+Le document actuel stocke un Brief, un Cut et une composition par thème. Dans cette composition,
+`rows[].items[]` décrit les anciennes pièces Lego, `layers[]` décrit les calques, `groups[]`
+regroupe certains calques et `slides[]` relie une diapositive à un groupe. Le format actif vit au
+niveau du document, tandis que son changement peut modifier les calques.
+
+Ce montage ne peut pas représenter proprement les trois notions dont la vision a besoin :
+
+- une **page**, qui possède tous ses objets ;
+- une **source canonique**, indépendante du canal ;
+- une **variante**, qui surcharge seulement ce qui diffère pour Instagram, LinkedIn ou A4.
+
+Le contrat suivant reste illustratif et vit uniquement dans cet audit. Il décrit la direction, pas
+du code prêt à copier :
+
+```text
+MediaDocument
+  schemaVersion
+  project
+  assets[id]
+  pages[id]
+    orderedNodeIds
+    pageOverrides
+  nodes[id]
+    kind
+    parentId
+    geometry
+    content
+    appearance
+    componentRef
+  variants[id]
+    formatId
+    pageIds
+    nodeOverrides[id]
+  publications[id]
+    variantId
+    artifacts[]
+    destination
+    status
+    receipts[]
+```
+
+Les masques deviennent des nœuds de page maître ou des nœuds partagés explicites, au lieu d'être
+déduits de l'absence de `slideId`. Les pièces Lego et les calques deviennent des nœuds avec des
+capacités différentes, au lieu de rester deux populations que l'interface compte, sélectionne et
+exporte différemment.
+
+### Règle de variante
+
+Une variante ne copie pas toute la scène et ne réécrit pas sa source. Elle contient :
+
+- le format cible ;
+- les pages retenues ;
+- les écarts de texte, position, taille, visibilité ou ressource ;
+- la version de la source à laquelle ces écarts s'appliquent ;
+- les conflits à résoudre si la source change.
+
+Le rendu résout `source + variante + format` sans mutation. La compilation garde alors sa propriété
+la plus précieuse : mêmes entrées, même sortie.
+
+## Persistance et reprise
+
+### Deux vérités
+
+`store.js` garde projets, projet courant et journal dans `localStorage`. `document.js` lit et écrit
+un `.zmedia.json` dans Create, puis le projet chargé rejoint aussi le store local. Cette duplication
+peut être utile comme cache, mais aucun champ ne dit quelle copie gagne, quelle révision est sale,
+ni quelles modifications suivent le dernier SHA enregistré.
+
+Le store attrape toute exception et retourne `false`, tandis que ses appelants poursuivent comme si
+l'écriture avait réussi. Les images de la bibliothèque sont résolues en data URL avant d'entrer
+dans la composition ; quelques images pleines peuvent donc dépasser le quota de `localStorage`.
+Une valeur corrompue est, elle aussi, remplacée silencieusement par le fallback. Ces deux chemins
+transforment une limite de stockage en perte invisible.
+
+La frontière Create valide seulement le Brief avant écriture. Un Cut mal formé, des identifiants
+dupliqués, une composition incohérente ou un `formatId` inconnu peuvent donc être réenregistrés.
+`getFormat` remplace en outre silencieusement tout identifiant inconnu par le premier format Web,
+ce qui cache la corruption sans réparer le champ persistant. Chargement et sauvegarde doivent
+valider le document entier, distinguer réparation sûre et erreur bloquante, puis refuser une
+réécriture qui perdrait une intention inconnue.
+
+Le statut du bas considère la présence d'un chemin comme un signe d'enregistrement ; après une
+modification, ce symbole reste donc rassurant alors que le fichier distant ne contient pas le
+nouvel état.
+
+Le chargement de thème introduit une course supplémentaire. Quand `themeId` change, l'effet lance
+`loadTheme` mais conserve l'ancien objet `theme` jusqu'à la résolution. Dans le même intervalle,
+l'effet d'initialisation voit un nouveau projet sans Cut et un thème non nul, puis appelle
+`buildCut`. Le document créé depuis Create, encore en version 1 et sans Cut, peut ainsi recevoir la
+partition du thème précédemment affiché. La ressource chargée doit porter son propre ID et aucun
+calcul ne doit l'employer tant qu'il ne correspond pas à la sélection courante.
+
+Le thème et le format ne sont d'ailleurs pas restaurés lors d'un simple changement entre les
+projets locaux. Ils vivent dans deux états globaux, comme la sélection, le sous-nœud choisi et le
+verrou du panneau. Un projet chargé depuis Create fixe ces valeurs une fois, puis toute navigation
+locale conserve ce contexte sur le projet suivant. L'interface doit décider quels réglages sont
+des préférences de poste et lesquels appartiennent au document, puis appliquer cette distinction
+atomiquement au lieu de laisser le titre changer seul.
+
+L'association à Create présente un défaut plus direct encore. `docPath`, `docSha` et `published`
+vivent une seule fois dans `MediaApp`, alors que l'utilisateur peut garder plusieurs projets
+locaux et passer de l'un à l'autre. Les actions Nouveau, Dupliquer, Supprimer et la liste des
+projets changent `currentId` sans changer ces trois états. Dès lors, après avoir enregistré A puis
+ouvert ou créé B, `⌘S` peut envoyer B vers le chemin de A avec le SHA de A. Le champ `path` que
+`fromDocument` place dans le projet n'est, lui, jamais utilisé pour restaurer cette association.
+
+Une seconde fragilité touche l'identité locale. `newProject` et `duplicateProject` emploient la
+longueur de la liste comme compteur de `makeId`. Si trois projets existent, que le deuxième est
+supprimé et qu'un nouveau projet est créé, la longueur redevenue égale à deux peut reproduire
+l'identifiant d'un projet survivant créé avec ce même compteur. `patchProject`, qui transforme
+toutes les entrées portant `currentId`, peut alors mettre à jour plusieurs projets. Enfin, si
+`loadCurrentId` rend un identifiant absent, l'affichage retombe sur le premier projet tandis que
+`patchProject` continue de chercher l'identifiant périmé : l'utilisateur voit un projet qu'il ne
+peut plus modifier.
+
+### Contrat recommandé
+
+- `documentId` reste stable, contrairement au chemin ;
+- chemin Create, SHA de base et reçus appartiennent au document, jamais à l'état global de la vue ;
+- tout changement de projet restaure cette association ou ouvre explicitement un document local
+  encore sans chemin ;
+- l'identifiant est unique indépendamment du nombre de projets et la lecture répare ou refuse les
+  doublons ;
+- `revisionId` et `baseRevisionId` identifient chaque sauvegarde ;
+- `savedHash` se compare au hash courant pour produire `clean` ou `dirty` ;
+- un brouillon local horodaté protège chaque minute de travail ;
+- les gros actifs vivent dans un stockage de blobs référencé, jamais dans le JSON ni dans
+  `localStorage` ;
+- l'ouverture propose la reprise si le brouillon est plus récent ;
+- un document d'une version future est lisible en mode protégé, jamais réécrit ;
+- chaque migration est pure, testée sur fixture et réversible par conservation de l'original.
+
+Le checksum actuel de `contracts.js` convient à une signature stable, mais pas à une preuve
+d'intégrité hostile. Il faut le nommer `stableHash` ou adopter SHA-256 pour les artefacts, afin que
+le vocabulaire ne promette pas une propriété cryptographique absente.
+
+## Historique et commandes
+
+`patchComposition` sert de point d'entrée unique, ce qui constitue une bonne base. Il mélange
+cependant quatre responsabilités : calculer l'état, appliquer l'Auto Layout, pousser l'historique
+et persister tout le projet. Un geste continu appelle cette fonction à chaque mouvement.
+
+La géométrie du geste n'emploie pas non plus la même matrice que le rendu. La boîte de sélection
+reçoit la rotation, mais pas les retournements, tandis que `applyHandle` interprète toujours les
+deltas du pointeur selon les axes de l'écran. Après une rotation de 90 degrés, tirer la poignée
+visuellement placée en bas continue donc de redimensionner selon l'axe horizontal local. Ce défaut
+touche déjà tous les calques, puis se propage à l'édition interne du tracé I2.
+
+Le futur contrat doit distinguer :
+
+- **preview transaction** : état fluide pendant le pointeur, non inscrit dans l'historique ;
+- **commit transaction** : un avant, un après, un libellé et les identifiants touchés ;
+- **persistence scheduler** : sauvegarde locale différée après le commit ;
+- **document save** : révision explicite vers Create.
+
+Cette séparation réduit les écritures, rend Annuler humain et prépare une commande centralisée que
+menus, clavier, palette et accessibilité peuvent invoquer sans dupliquer la logique.
+
+Le Cut possède en parallèle un verrou dont le sens est faux : toutes les opérations d'édition
+ignorent `cut.locked`, hormis `refitCut`. La fusion concatène les slots de deux blocs puis garde les
+quatre premiers, ce qui supprime silencieusement tout média excédentaire. Enfin, `addBeat` dérive son
+identifiant de la position et de la longueur ; après suppression ou fusion, une nouvelle insertion
+peut retrouver une graine déjà employée. Le contrat doit décider si Verrouillé interdit toute
+mutation, faire refuser une fusion avec perte ou demander un choix, puis garantir l'unicité des
+blocs indépendamment de leur rang.
+
+## Compilation et scène
+
+### Trois voies de rendu
+
+Le compilateur choisit entre le thème HTML brut, les rangées Lego et les calques absolus. Les
+rangées utilisent les valeurs par défaut déclarées du composant, tandis que les calques composants
+fusionnent directement les données et leurs propriétés. Une même pièce peut donc se comporter
+différemment selon la voie qui l'a posée.
+
+La bibliothèque ajoute encore des composants Lego alors que la palette sait poser un calque
+composant. Cette dualité se retrouve dans la sélection, la barre d'état, le compte d'objets, les
+slides, les raccourcis et le panneau Détails.
+
+Le contrat de propriétés diverge également entre ces voies. Les registres déclarent des champs
+`text`, `bool`, `color`, `number` et `choice`, avec options et valeurs par défaut ; l'inspecteur
+Lego rend cependant les booléens et les choix comme du texte libre, conserve les nombres sous
+forme de chaînes et ne montre pas les options. Les calques composants, eux, n'exposent pas ces
+champs déclarés et ne passent pas par le même résolveur de valeurs par défaut. Changer la source
+d'un tel calque conserve en outre `props.__nodes`, dont les chemins positionnels peuvent alors
+viser un autre DOM. Une entrée Spotify mal formée, `{ key: '16', type: '9' }`, montre qu'aucun
+validateur de schéma n'arrête aujourd'hui une propriété incohérente au chargement.
+
+Le compilateur garde aussi plusieurs promesses qui ne correspondent pas à ses données réelles.
+`visibleBeats` annonce une sélection par poids, puis prend simplement les premiers blocs avec
+`slice`. `templateData` expose titre, message, audience, registre, intention et texte des blocs,
+mais aucune source, preuve, langue, mention ou image de leurs slots ; un thème HTML brut ne peut
+donc pas réaliser la richesse annoncée par le Brief et le Cut. Cette même voie reçoit tous les
+beats, même lorsque le format Poster déclare `maxBeats` ; ses métadonnées annoncent pourtant le
+nombre réduit de `visibleBeats`. Le fichier peut ainsi montrer davantage de blocs que son reçu.
+Le facteur `scale`, estimé ou mesuré, n'agit pas davantage sur ces sept gabarits : aucun ne consomme
+`{{scale}}`, et cette voie n'injecte ni transformation ni variable commune. La boucle de mesure peut
+donc descendre jusqu'au minimum en recompilant un HTML identique. Le test « compile sur six
+formats » ne vérifie que quelques chaînes et ne mesure ni dimensions ni débordement.
+Dans la voie composée, la métrique `shown` compte uniquement les pièces des rangées et exclut tous
+les calques ; un composant absent du bundle disparaît sans erreur. Ces valeurs ne doivent pas
+alimenter un statut produit tant que leur contrat n'est pas aligné avec la scène rendue.
+
+La mise à l'échelle mesurée peut, elle aussi, rester périmée. L'effet qui remet `contentScale` à
+zéro observe format, thème, mode sombre, Cut, titre et message, mais ni la composition ni la page
+active. Une page qui a dû rétrécir peut donc rester réduite après suppression ou raccourcissement
+d'un calque, puis transmettre cette même échelle aux autres pages lors de l'export de lot. La
+mesure doit appartenir au couple page et variante, être invalidée par toute mutation qui change le
+rendu, puis être recalculée avant chaque artefact.
+
+Enfin, `validateTheme` exige seulement quatre groupes et contrôle leurs objets très
+superficiellement, alors que la voie à tokens lit directement `theme.chrome`, `theme.motion` et de
+nombreux champs imbriqués. Un thème JavaScript peut donc passer le validateur puis casser la
+compilation ; de même, le merge superficiel d'un header HTML peut remplacer une sous-structure
+typographique complète par un fragment incomplet. Validation et valeurs par défaut doivent être
+récursives et exercées sur chaque thème chargeable avant son apparition dans l'interface.
+
+Le chemin de migration doit être explicite :
+
+1. définir un adaptateur de lecture des anciennes rows vers le Node canonique ;
+2. rendre les deux modèles avec le même résolveur de propriétés ;
+3. écrire uniquement le nouveau modèle dans les nouveaux documents ;
+4. migrer les documents existants au moment d'une sauvegarde confirmée ;
+5. retirer l'ancien chemin seulement après fixtures, comparaison de HTML et validation visuelle.
+
+### Identité des sous-composants
+
+`nodes.js` identifie un élément par sa position dans le DOM, limite la profondeur et ne rend
+éditables qu'un nombre borné de textes. Modifier la structure du composant décale ces chemins ; un
+override devient alors orphelin ou vise le mauvais élément sans message. Une chaîne vide signifie
+en outre « revenir à la valeur source », ce qui empêche d'effacer volontairement un texte.
+
+Chaque part HTML doit déclarer des identifiants sémantiques stables, par exemple
+`data-zrm-node="headline"`, avec un schéma de propriétés et une version. Le moteur doit distinguer
+trois états : absence d'override, valeur vide volontaire et valeur renseignée. Lorsqu'une version
+retire `headline`, l'ouverture signale l'override orphelin et propose sa migration ; elle ne
+l'ignore pas.
+
+Le verrou obéit lui aussi à plusieurs définitions. Le mouvement consulte bien le verrou effectif
+du groupe, tandis que la boîte, ses poignées et le double-clic ne lisent que `layer.locked`. Un
+calque dont le groupe est verrouillé peut donc paraître redimensionnable et entrer en édition de
+texte, même si le déplacement est ensuite refusé. Le verrou du Cut est encore plus étroit : il
+empêche seulement `refitCut`, alors que rôle, texte, images, ajout, suppression, fusion, scission et
+reconstruction depuis les notes restent possibles malgré le libellé « ne bouge plus ».
+
+Enfin, le réglage d'alignement vertical ne tient pas son contrat. `LAYER_STYLES` écrit
+`justifyContent` sur le conteneur du calque, mais la règle CSS finale de `.zrm-layer-text` impose
+ensuite `justify-content:center`. Le Post-it Miro ajouté pendant l'audit paraît centré grâce à cette
+valeur fixe ; il ne prouve pas que le réglage Vertical fonctionne.
+
+### Pages, groupes et connecteurs
+
+La diapositive réemploie un groupe ordinaire comme conteneur système, sans protéger cette identité.
+Or la hiérarchie affiche ce même groupe avec les commandes ordinaires. Grouper deux de ses membres
+leur attribue un nouveau `groupId`, si bien qu'ils quittent la diapositive et deviennent un masque
+global. Dissoudre le groupe support libère ses membres ; le slide, qui ne référence plus un groupe
+existant, disparaît ensuite de `readSlides`. Supprimer ce groupe efface ses membres sans retirer
+proprement la métadonnée de slide. Si `activeSlideId` vise alors ce slide disparu, la règle de
+visibilité ne trouve plus de page active valide et rend simultanément les calques de toutes les
+slides restantes. Une page ne peut donc pas rester un alias de groupe dès lors que l'utilisateur
+peut manipuler les groupes.
+
+Le presse-papiers retire délibérément `groupId` de chaque calque avant de le recréer, mais ne lui
+attribue pas le groupe de la diapositive active. Toute copie devient ainsi un masque global. Une
+opération de collage doit choisir explicitement Page active ou Masque et reconstruire d'abord la
+table ancien ID vers nouvel ID, afin que relations et autres références internes soient remappées
+dans un second passage.
+
+Le connecteur Miro concentre les mêmes ambiguïtés. Sa création contourne `poserCalque`, qui rattache
+normalement tout nouvel objet à la diapositive active, et appelle directement `addLayer`. Il garde
+donc `groupId:null` et devient un masque rendu sur toutes les pages, y compris lorsque ses deux
+extrémités appartiennent à une seule slide. Comme la sélection conserve des objets hors page, rien
+n'empêche non plus de relier deux pages différentes.
+
+Son rendu possède un défaut indépendant : l'élément externe garde la classe
+`.zrm-layer-shape`, dont la feuille commune impose un fond accent. L'absence de `data-shape`
+empêche seulement les variantes ellipse ou ligne ; elle ne retire pas le fond. Une diagonale peut
+donc peindre tout son rectangle englobant derrière le `<svg><line>`. Cette boîte, parfois immense,
+sert aussi de cible à la sélection, au marquee, aux guides et aux alignements alors que l'objet
+visible n'occupe qu'un trait de deux pixels.
+
+La relation ne survit pas aux opérations usuelles :
+
+- supprimer une extrémité vide sa référence à la prochaine lecture ; `estConnecteur` devient faux
+  et le résidu compile comme un rectangle, contrairement au KANBAN qui le dit figé en ligne ;
+- copier ou coller un ensemble ne remappe pas `connectFrom` et `connectTo`, qui continuent de viser
+  les originaux ;
+- dupliquer une slide copie superficiellement les références d'un éventuel connecteur membre vers
+  les objets de la slide source ; le connecteur créé par l'interface, qui est global, n'est pas
+  dupliqué avec la slide ;
+- redimensionner, déplacer ou tourner le connecteur ne produit pas un réglage durable, puisque
+  `applyConnectors` recalcule sa boîte à la mutation suivante ;
+- aucun port, ancrage de bord, flèche, routage, style de trait ou état d'extrémité manquante ne
+  possède de contrat.
+
+Une relation doit devenir un nœud typé qui porte sa page, deux références remappables et une
+politique explicite lorsque l'une disparaît. Son hit-test doit suivre le trait, tandis que la boîte
+géométrique reste une donnée de calcul non peinte. Jusqu'à cette reprise, M6 prouve un prototype
+unitaire, non un connecteur de document fiable.
+
+### Tracés vectoriels
+
+La Plume Illustrator I2 ajoute un vrai chemin cubique à un calque `shape`, avec ancres et poignées
+en pourcentage de sa boîte. Le compilateur produit un `<path>` SVG, ce qui forme une première
+verticale cohérente entre données, édition et HTML. Cette verticale hérite toutefois des défauts du
+socle et ajoute quatre invariants qui ne sont pas encore tenus.
+
+Premièrement, `createPathLayer` contourne lui aussi `poserCalque` et ne rejoint pas la diapositive
+active. Deuxièmement, chaque mouvement d'ancre traverse `patchComposition`, donc l'historique et la
+sauvegarde, au lieu de n'enregistrer qu'au relâchement. Troisièmement, la surcouche suit la rotation
+visuelle de la boîte mais le calcul du pointeur n'applique pas la matrice inverse ; un tracé tourné
+ou retourné ne s'édite pas dans son propre repère. Quatrièmement, insérer un point sur une courbe
+ajoute un angle sans subdiviser ses contrôles par De Casteljau, aussi la silhouette peut-elle
+changer pendant une opération censée la préserver.
+
+La borne 0 à 100 empêche en outre une poignée de sortir de la boîte, un chemin à deux points peut
+porter `pathClosed:true` tout en restant ouvert dans `pathD`, et les commandes de double-clic ou de
+suppression ne consultent pas toutes le verrou effectif du groupe. Comme le calque reste de genre
+`shape`, l'inspecteur propose enfin un Type de forme sans effet, tandis que bordure et ombre CSS
+peuvent encore dessiner la boîte rectangulaire autour du SVG. Il propose aussi un Dégradé que la
+compilation désactive explicitement sur le tracé, si bien que l'état enregistré et le rendu se
+contredisent. Le brouillon modal survit enfin à la désactivation de la Plume et à plusieurs
+changements de contexte, faute d'être porté par une machine d'état de commande.
+
+Le modèle futur n'a pas besoin d'un moteur géométrique général pour corriger ces points. Un nœud
+Path typé, rattaché à une page, une transaction de geste, une matrice unique et une subdivision
+correcte suffisent à stabiliser I2 ; Pathfinder et Shape Builder restent des lots séparés.
+
+La compatibilité ascendante souffre enfin d'un problème plus large. `readLayers` filtre les genres
+inconnus malgré son commentaire « sans jamais jeter », puis `readGroups` et `readSlides`
+reconstruisent une liste fermée de champs. Un document futur ouvert puis enregistré peut ainsi
+perdre un nœud, les extensions d'un groupe ou celles d'une slide, même avant `toDocument`. Les
+normaliseurs doivent préserver le brut inconnu ou refuser l'écriture d'une version supérieure ;
+ils doivent aussi vérifier l'unicité des identifiants, faute de quoi React réemploie des clés et
+`patchLayer` modifie plusieurs objets qui partagent le même ID.
+
+## Exports
+
+### HTML
+
+L'export HTML embarque les polices utilisées et constitue la sortie la plus complète. Il reste à
+prouver que les images, CSS, attributs de langue, liens et composants distants sont eux aussi
+autonomes. Le `lang="fr"` ne doit pas rester figé si le Brief demande du japonais ou une autre
+langue.
+
+Illustrator I7, publié au commit `2156228`, ajoute `embedImages` aux trois exporteurs. Il transforme
+certaines balises `img` distantes en URI `data`, mais une erreur ou un refus CORS conserve
+silencieusement l'URL et laisse donc l'autonomie non satisfaite. Son cache global, non borné et
+sans nouvelle tentative après échec, conserve les octets ou le défaut pendant toute la session.
+Son expression régulière ignore les guillemets simples, `srcset`, les images CSS et les éléments
+SVG `image`, tout en prenant à tort `data-src` pour `src` ; une URL contenant `&amp;` est envoyée
+au réseau sous sa forme échappée. Les requêtes sont séquentielles, sans délai maximal ni annulation,
+si bien qu'une seule origine lente peut suspendre tout export. Enfin, le PDF n'attend pas
+explicitement `decode()` avant l'impression. Cette étape doit produire un inventaire d'actifs, une
+progression et une erreur bloquante explicite, non une meilleure chance d'obtenir un fichier
+autonome.
+
+L'autonomie typographique est incomplète : le compilateur déclare les coupes romaine et italique
+d'Anthropic Serif, mais `embedFonts` ne remplace que la romaine par une data URL et la réannonce en
+style normal. Une page exportée hors ligne peut donc synthétiser l'italique ou retomber sur Georgia,
+alors que l'aperçu charge le vrai fichier Italics. La porte doit comparer les faces chargées et les
+mesures de texte entre aperçu et fichier autonome.
+
+Le HTML brut d'un thème traverse le compilateur comme document de premier niveau. `inspectTemplate`
+existe, mais `loadTheme` ne l'appelle pas ; titre, boucle de blocs, squelette, scripts et ressources
+externes ne sont donc pas contrôlés au chargement, contrairement au commentaire du module. Un
+export ouvert hors de l'iframe peut exécuter le script d'un thème ou contacter une origine tierce.
+Le manifeste doit déclarer les ressources autorisées, tandis qu'un validateur refuse scripts,
+handlers inline et URL externes qui ne sont pas explicitement permises.
+
+Un second canal CSS vient du champ libre Ombre. Sa valeur passe dans
+`box-shadow:${escapeHtml(ombre)}` ; l'échappement HTML ne retire ni point-virgule ni déclaration CSS.
+Un document peut ainsi injecter d'autres propriétés, dont une URL externe, dans l'attribut `style`.
+Les styles libres doivent passer par un parseur typé ou par des paramètres numériques bornés, non
+par une chaîne CSS concaténée.
+
+### PNG
+
+La chaîne `HTML -> SVG foreignObject -> Image -> canvas -> PNG` présente plusieurs risques :
+
+- compatibilité différente selon Safari, Chrome et les contenus CSS ;
+- perte des attributs et styles posés sur `html` ou `body` lors de la reconstruction du wrapper ;
+- fond blanc imposé, donc transparence impossible ;
+- hauteur 1 200 arbitraire pour les documents à flux ;
+- absence d'attente explicite de toutes les images et ressources ;
+- poids maximal déclaré dans le format jamais appliqué ;
+- réussite du téléchargement assimilée à la fidélité du fichier.
+
+Le moteur de sortie doit rendre dans un navigateur automatisé contrôlé, attendre
+`document.fonts.ready` et toutes les ressources, capturer la surface exacte, puis rouvrir le PNG et
+mesurer largeur, hauteur, alpha et poids. Une comparaison perceptuelle sur un petit corpus de
+référence complète cette preuve.
+
+Le format Overlay promet actuellement un canal alpha que les deux voies de sortie rendent
+impossible : le HTML compilé applique un fond opaque au document et à la page, puis le PNG remplit
+le canevas en blanc. Même le script Playwright proposé par `forge.js`, qui passe
+`omitBackground:true`, ne peut pas retirer une couleur écrite par la feuille de style. La porte
+doit lire les pixels du fichier final et exiger qu'au moins un pixel porte un alpha inférieur à
+255 lorsque le profil le demande.
+
+### PDF
+
+`exportPdf` ouvre le dialogue d'impression et retourne `{ container: 'pdf' }`. L'application ne
+connaît ni le chemin, ni le nombre de pages, ni le poids, ni les marges du fichier choisi par
+l'utilisateur. Cette sortie ne peut donc pas devenir une étape automatisée ou un reçu de
+publication.
+
+Cette iframe de rendu ne porte aucun `sandbox`. Comme le thème HTML brut n'est pas filtré, un
+`<script>` inclus dans un paquet s'exécute dans le `srcdoc` de même origine et peut atteindre son
+parent au moment où l'utilisateur demande le PDF. Cette frontière doit être fermée avant que des
+thèmes extérieurs au dépôt soient acceptés.
+
+Le PDF doit être produit comme un job contrôlé, puis inspecté : MediaBox, pages, polices, fond
+perdu, transparence, taille et miniature. Tant que ce pipeline n'existe pas, l'interface doit dire
+« Ouvrir l'impression » plutôt qu'« Exporter un PDF ».
+
+Plus largement, les profils déclarent `delivery.maxBytes`, transparence, fond perdu, mode couleur
+et stratégie de débordement, mais le flux réel n'applique presque aucun de ces champs. Les formats
+print à pagination restent un canevas fixe dont le surplus est caché, le fond perdu n'entre dans
+aucune géométrie et la couleur n'est ni convertie ni vérifiée. `validateJob` et
+`validateDeliverable` restent cantonnés aux tests ; ni Export ni Forge ne les appellent. Ces champs
+doivent donc être marqués « informatifs » jusqu'à ce qu'un artefact prouve leur respect.
+
+### Vidéo
+
+`forge.js` décrit une commande et un script de rendu, sans exécuter, suivre ni reprendre un job.
+Le découpage naïf d'une commande sur les espaces casse les chemins cités. La durée dépend du Cut,
+non des pages ou animations de la scène. Aucun son n'entre dans le graphe. L'identité octet pour
+octet d'un conteneur vidéo n'est pas prouvée, car les métadonnées et horodatages peuvent varier.
+
+Le script généré cherche par défaut `page.html`, tandis que l'export HTML prend le titre du projet
+comme nom ; la marche à suivre demande seulement de placer les deux fichiers côte à côte. Le
+premier lancement peut donc échouer sur un fichier absent. `spawn` n'écoute pas son événement
+`error` et la fermeture du navigateur ne vit pas dans un `finally`, si bien qu'une erreur de
+lancement ou de capture peut laisser Chromium ouvert. Ces défauts confirment qu'il s'agit d'une
+recette, non d'un job exécuté.
+
+La vidéo doit attendre la stabilisation des pages fixes. Elle demande ensuite un manifeste de
+frames, une horloge unique, un job persistant, des logs, une reprise, une vérification codec/pixel
+format/durée et un hash d'artefact.
+
+### Lot de publication
+
+La première sortie stratégique n'est ni PPTX ni vidéo. C'est un dossier ou ZIP qui contient :
+
+- `manifest.json` avec document, révision, variante, format et ordre des pages ;
+- une image par page, nommée `01`, `02`, etc. ;
+- texte de légende et texte alternatif ;
+- aperçu contact sheet ;
+- rapport QA et hash SHA-256 de chaque fichier ;
+- instructions ou lien de remise pour la destination.
+
+Cette sortie fonctionne avant toute API Instagram ou LinkedIn et transforme immédiatement les
+slides en carrousel utilisable.
+
+La carte PowerPoint P8 ajoutée pendant l'audit constitue un premier fil de cette sortie : elle
+recompile chaque slide et appelle `exportPng` en boucle. Elle ne ferme cependant pas le contrat :
+
+- le navigateur reçoit plusieurs téléchargements automatiques, qu'il peut bloquer après le premier ;
+- une erreur au milieu laisse un lot partiel déjà téléchargé ;
+- aucun Blob ne revient à l'appelant, donc aucun ZIP ou manifeste ne peut être assemblé ;
+- le Critique et l'ajustement mesuré concernent la page active, non chaque page exportée ;
+- `contentScale` de la page active est transmis à toutes les compilations ;
+- `safeFileName` tronque avant de préserver le numéro, si bien qu'un long titre peut donner le même
+  nom aux pages ;
+- le test ajouté vérifie le bouton et l'isolation du HTML, tout en déclarant explicitement que le
+  vrai PNG ne s'exécute pas sous jsdom.
+
+La fonction de rasterisation doit d'abord retourner un Blob sans le télécharger. Le job de lot
+peut alors contrôler toutes les pages, réserver le suffixe numérique, assembler une archive et ne
+déclencher qu'un seul téléchargement après réussite complète.
+
+## Publication et galerie
+
+`publish.js` assemble une page Markdown depuis le Brief et le Cut, l'écrit sous `pages/Media` puis
+copie son URL. Cette fonction remplit une ancienne vision éditoriale, mais le bouton actuel se
+trouve dans l'éditeur visuel et porte le verbe Publier. L'utilisateur s'attend donc à publier ce
+qu'il voit.
+
+Il faut séparer trois actions :
+
+1. **Enregistrer le projet** : écrit la source éditable ;
+2. **Produire les fichiers** : crée et vérifie les artefacts ;
+3. **Publier ou remettre** : envoie les artefacts, ou fournit le paquet prêt.
+
+Un objet Publication persistant conserve destination, état, artefacts, légende, date, tentatives,
+erreur et reçu distant. La galerie affiche ces objets, non les seuls fichiers `.zmedia.json`.
+
+Le premier adaptateur peut rester manuel : il prépare le paquet, ouvre la destination et marque
+« remis » après confirmation. Les API, OAuth, webhooks, limites de plateforme, retries et
+analytics arrivent après ce contrat, puisqu'ils doivent tous écrire le même reçu.
+
+## Critique et garanties
+
+Le Critique protège aujourd'hui la longueur du Cut, quelques zones sûres, le contraste de palette,
+des sélecteurs `.zrm-*`, le débordement et certaines mesures typographiques. Quand une composition
+existe, il supprime surtout le signal d'omission du Cut ; il ne comprend pas pour autant chaque
+calque ou composant.
+
+La présence d'une composition ne désactive que le défaut d'omission. Les nombres de beats, le CTA,
+les mentions et certaines limites de durée continuent de provenir du Cut et peuvent bloquer une
+sortie visuelle dont le contenu réel vit dans les calques. Les contrôles rendus de zones sûres, de
+typographie et de veuves cherchent par ailleurs d'anciens sélecteurs `.zrm-title` et
+`.zrm-beat-*` ; un composant Lego ou un calque absolu peut donc échapper à la règle tout en occupant
+le fichier final. `declensionState`, qui ne transmet pas la composition, accentue ce décalage dans
+la vue des sorties.
+
+Une règle est même inatteignable : `slots.many` demande que le total d'images dépasse quatre fois
+le nombre de blocs, alors que chaque bloc valide est déjà borné à quatre slots et qu'un Cut invalide
+est rejeté avant cette branche. Le journal d'export ajoute une autre fausse preuve : pour HTML et
+PNG, le checksum porte sur le HTML compilé plutôt que sur les octets livrés ; pour PDF, le poids
+reste nul. Deux PNG différents peuvent donc partager l'empreinte affichée, tandis que
+`validateDeliverable` n'est jamais appelé par le parcours. Les règles mortes doivent être retirées
+ou rendues atteignables, et chaque reçu doit mesurer le fichier qui quitte réellement le système.
+
+Les garanties manquantes sont les suivantes :
+
+- visibilité effective et hors-canevas de chaque nœud ;
+- contraste calculé depuis le rendu, y compris photo, dégradé, mélange et opacité ;
+- police réellement chargée et glyphes disponibles, notamment japonais ;
+- texte alternatif et langue ;
+- poids, dimensions, alpha, pages, codec et durée de l'artefact final ;
+- licence et provenance des actifs ;
+- liens sûrs et accessibles ;
+- critères propres à Instagram et LinkedIn ;
+- cohérence de toutes les pages d'un carrousel ;
+- override orphelin après évolution d'un composant.
+
+Chaque règle doit déclarer son objet d'entrée : modèle, DOM rendu ou fichier final. Une règle de
+fichier ne peut pas être déclarée verte à partir du DOM.
+
+## Performance et taille
+
+Les risques observés se concentrent sur les boucles fréquentes :
+
+- sérialisation du store complet à chaque mouvement ;
+- copie de composition et recalcul d'Auto Layout à chaque mutation ;
+- composant React unique, dont beaucoup d'états déclenchent de larges rerendus ;
+- iframe rechargée après compilation différée ;
+- index de polices JavaScript d'environ 564 Ko, actifs publics d'environ 52 Mo et six gabarits HTML
+  qui embarquent déjà des fontes en base64 ; les sept gabarits racine totalisent environ 3,85 Mo ;
+- 1 024 thèmes documentés qu'un registre manuel ne peut pas indexer fidèlement à cette échelle.
+
+Le build final rend cette dette visible dans les artefacts : le chunk `MediaApp` atteint environ
+796,66 Ko minifié, tandis que plusieurs thèmes HTML deviennent des chunks de 299,10 Ko à
+1 393,89 Ko, celui-ci pesant encore environ 1 044,84 Ko après gzip. Vite signale les chunks de plus
+de 500 Ko. Le chargement paresseux limite le coût initial, mais copier des polices dans chaque
+gabarit ne peut pas soutenir 1 024 thèmes.
+
+Les budgets proposés sont simples : 60 images par seconde pendant un glisser sur un document de
+200 nœuds, moins de 100 ms pour Annuler, moins de 500 ms pour changer de page, moins de deux
+secondes pour ouvrir un projet courant, et aucune écriture distante pendant un geste. Ils doivent
+être mesurés sur le Mac cible et sur un portable moyen, non déduits du nombre de lignes.
+
+## Prémortem
+
+| Échec futur plausible | Premier signal | Prévention avant extension |
+|---|---|---|
+| Une session disparaît après plusieurs images | `saveProjects` retourne `false`, sans effet visible | quota forcé en test, stockage de blobs, dirty state et récupération |
+| Enregistrer B écrase le fichier de A | le titre courant change mais le bouton garde le chemin et le SHA de A | association par document, reset atomique au changement et scénario E2E à deux projets |
+| Deux projets partagent le même identifiant | création après suppression avec `list.length` réutilisé | identifiants uniques, invariant au chargement et réparation explicite |
+| Un connecteur peint un grand rectangle sur tout le carrousel | wrapper de forme avec fond, relation sans `groupId` | nœud Relation typé, appartenance de page, golden diagonal et suppression d'extrémité |
+| Grouper deux objets fait disparaître leur diapositive | le nouveau groupe remplace le `groupId` de page | identité Page distincte, commandes système protégées et scénario groupe, copie, suppression |
+| Une fusion de blocs perd des images | concaténation puis `slice(0,4)` sans avertissement | opération refusée ou résolution explicite de chaque slot avant commit |
+| Les formats divergent après plusieurs allers-retours | coordonnées changées dans la source sans override affiché | compilation pure des variantes et test A/B/A |
+| Le carrousel paraît correct mais son ZIP est incomplet | export appelle seulement la page active | job de lot, manifeste attendu et contrôle du nombre de fichiers |
+| Le PNG diffère de l'aperçu Safari | police, `foreignObject` ou ressource non rendue | rendu contrôlé Chrome/WebKit et golden images |
+| Un thème mis à jour déplace tous les overrides | chemins DOM positionnels devenus orphelins | identifiants sémantiques, versions et migration |
+| Les 1 024 thèmes rendent le catalogue inutilisable | index manuel faux, recherche lente, bundles lourds | manifeste, index généré, pagination et budgets avant montée en volume |
+| Une publication API part deux fois | retry sans clé idempotente après timeout | état persistant, clé par tentative logique et reçu distant |
+| Un HTML de thème exécute du contenu inattendu | script ou ressource externe dans un export ouvert | validation du paquet, politique de contenu et isolation documentée |
+| Un export annoncé autonome arrive sans une image | CORS, URL échappée ou requête suspendue dans `embedImages` | inventaire DOM/CSS, délai maximal, politique d'échec, reprise et test hors ligne du fichier rouvert |
+| L'éditeur devient saccadé avec 200 objets | écritures et snapshots par mouvement | transactions, profil de performance et sélecteurs de scène |
+| Le japonais sort en tofu ou se coupe | font fallback silencieux ou glyphes absents | fixture multilingue, détection de glyphes et langue par page |
+| Le tableau annonce 8/8 mais personne ne publie | davantage de cartes, aucun reçu de publication | métrique temps jusqu'au livrable et porte verticale obligatoire |
+| Deux onglets écrasent une révision | SHA de base obsolète et cache local concurrent | baseRevision, conflit lisible, fusion ou duplication contrôlée |
+
+## Lots de génération future
+
+Ces lots décrivent ce qu'un futur agent pourra produire. Aucun n'est généré pendant l'audit.
+
+| Lot | Cible future | Contenu attendu | Porte obligatoire avant fusion |
+|---|---|---|---|
+| G0 | tests navigateur ZenRayMedia | fixtures, parcours création, sélection iframe, pages, export | Chrome et WebKit verts, captures conservées |
+| G1 | schéma et migrations | `schemaVersion`, migrations V1/V2, lecture protégée du futur, fixtures | aucun champ perdu sur aller-retour de toutes les fixtures |
+| G2 | transactions | commande, aperçu, commit, undo/redo, autosave différé | un glisser égale une entrée ; 100 gestes restent fluides |
+| G3 | scène unifiée | Node, Page, masque, adaptateurs Lego, sélection effective | ancien document et nouveau rendent le même HTML de référence |
+| G4 | variantes | source canonique, overrides de format, conflits | A vers B vers A ne change jamais la source |
+| G5 | export jobs | HTML, PNG, PDF, lot, manifeste, contrôles | artefacts rouverts et mesurés dans deux navigateurs |
+| G6 | publication | Publication, états, paquet manuel, galerie | un carrousel prêt apparaît dans la galerie avec son reçu |
+| G7 | modularisation UI | workspaces, panels, hooks de commande, sélecteurs | aucun changement de rendu ; tests de régression verts |
+| G8 | contrat de thème | manifeste versionné, nœuds sémantiques, index généré | sept paquets migrés, overrides conservés, métriques exactes |
+| G9 | intégrité des relations | Relation typée, références, page, remapping, politique d'extrémité | déplacement, copie, duplication de page et suppression gardent un rendu de ligne cohérent |
+| G10 | intégrité du tracé | chemin typé, commande de geste, matrice inverse, subdivision, appartenance de page | rotation, retournement, verrou, insertion et artefact conservent la même courbe |
+| G11 | intégrité des actifs | identité, provenance, droits, état lié ou incorporé, collecteur DOM/CSS et cache borné | toute ressource est incorporée ou bloque clairement ; le fichier rouvert hors ligne reste identique |
+
+L'ordre G0 à G6 ferme la vision actuelle. G7 et G8 réduisent ensuite le coût de croissance. G9
+répare le prototype Miro avant tout usage de plan. G10 stabilise la Plume et G11 l'incorporation
+d'images ; toute extension Illustrator vient ensuite d'un cas d'usage et d'une fixture, jamais du
+nom du logiciel seul.
+
+### Frontières de fichiers futures
+
+La modularisation ne doit pas suivre les panneaux visibles, car elle recréerait des dépendances
+croisées entre chaque bouton et le store. Quatre couches suffisent :
+
+| Couche | Modules futurs | Ne doit pas connaître |
+|---|---|---|
+| Domaine | document, page, node, variante, artifact, publication, migrations | React, navigateur, réseau |
+| Application | commandes, transactions, historique, sélection, jobs, Critique | JSX et détails de stockage |
+| Infrastructure | store local, Create, rasterizer, archive, adaptateurs sociaux | panneaux et états visuels |
+| Interface | Galerie, Editor, Variants, Delivery, panneaux et hooks | formats JSON bruts et appels réseau directs |
+
+Les modules actuels restent derrière des adaptateurs jusqu'à ce que leurs fixtures passent. Cette
+stratégie évite une réécriture totale et permet de déplacer une responsabilité à la fois.

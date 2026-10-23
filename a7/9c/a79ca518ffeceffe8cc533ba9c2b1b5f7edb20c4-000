@@ -1,0 +1,4 @@
+import { attachmentDownload } from '../../server/attachment-download.js'
+
+// Preserve native backpressure rather than buffering the download. (19 October 2026, 00:32 Paris)
+export const onRequest = (context) => attachmentDownload(context.request)

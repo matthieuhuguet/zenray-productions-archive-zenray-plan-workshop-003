@@ -1,0 +1,307 @@
+# Le thème client de streaming, conception au format du projet
+
+Document de conception. Il propose un thème complet au format de dossier déjà en service, celui de
+la forme 3 décrite dans `03-themes.md`, et rien d'inventé à côté.
+
+## 0. Ce que j'ai lu, et ce que je n'ai pas lu
+
+Lus en entier avant d'écrire une ligne : `docs/zenraymedia/KANBAN.md`, `src/components/Icon.jsx`
+(207 lignes, les 91 clefs du dictionnaire `P` comptées une à une),
+`src/zenraymedia/componentCatalog.js` (55 lignes),
+`src/zenraymedia/themes/T-04-1-1--revelation-cinematique/theme.json`,
+`src/zenraymedia/themes/T-04-1-1--revelation-cinematique/parts/01-title-screen.html`. Lus par
+extraits ciblés, et je le signale parce que la conclusion en dépend : `compile.js` lignes 195 à 260
+(la fonction `splitPart` et la fonction `composedPage`), `htmlTemplate.js` lignes 1 à 60 (le contrat
+du moteur de gabarit), `scripts/zrm-build-theme.mjs` lignes 185 à 215 (le registre) et ligne 365 (le
+garde-fou des ressources distantes), `src/zenraymedia/taxonomy.js` lignes 5 à 30 (les seize
+familles), `src/zenraymedia/formats.js` (les sept identifiants de format), `src/config/colors.js`
+lignes 1 à 40, ainsi que `parts/21-cards.html` et `parts/00-icons.html` du thème de jeu, en tête.
+
+Ce que je n'ai pas : la moindre capture de l'interface décrite. `docs/zenraymedia/references-jpeg/`
+n'existe pas sur le disque, je l'ai vérifié. Aucune mesure de cette conception n'est donc une mesure,
+et tout ce qui touche aux proportions, à la police et aux couleurs y est écrit comme une hypothèse à
+vérifier sur captures, selon la méthode déjà éprouvée du `PROTOCOLE.md` de T-04-1-1.
+
+## 1. Identité du thème
+
+La famille est déjà déclarée dans `taxonomy.js` : `'09': 'Musique & sound'`, et son registre dominant
+vaut `divertissement`. Aucun thème de la famille 09 n'existe sur disque, les six thèmes présents se
+répartissant en cinq de presse et un de jeu, si bien que la sous-famille 1 et la variante 1 sont
+libres. L'identifiant proposé est donc `T-09-1-1`, et le dossier
+`src/zenraymedia/themes/T-09-1-1--client-de-streaming-sombre/`, avec les quatre entrées
+obligatoires : `theme.json`, `tokens.css`, `parts/`, et `component-registry.json` que le script
+produit.
+
+Le `theme.json` proposé, dans la forme exacte que `zrm-build-theme.mjs` réinjecte au caractère près
+dans l'en-tête `<!--zr-theme-->` du gabarit compilé :
+
+```json
+{
+  "description": "Client de streaming sombre : barre de recherche haute, bibliotheque laterale a pilules, en-tete d'album en degrade, liste de pistes dense, panneau de credits et barre de lecture basse.",
+  "formats": [
+    "F-web-article",
+    "F-still-1080-square",
+    "F-still-1080x1350",
+    "F-still-1080x1920",
+    "F-video-1920x1080",
+    "F-overlay-1920x1080"
+  ],
+  "beatCount": { "min": 3, "max": 10 },
+  "measure": 46,
+  "fonts": ["Figtree", "Manrope", "JetBrains Mono"],
+  "calibration": {
+    "ref": "AUCUNE",
+    "notes": "Aucune capture n'a encore ete deposee. La police du client reel est une geometrique sous licence, non redistribuable, donc non embarquable : Figtree et Manrope sont deux CANDIDATES a departager par le rapport hauteur sur largeur de la capitale, mesure sur capture, exactement comme Barlow Condensed l'a ete pour T-04-1-1. Tant que la mesure n'est pas faite, ce champ ne vaut rien."
+  }
+}
+```
+
+`F-print-a4` est volontairement absent : une interface d'application ne s'imprime pas, et déclarer un
+format qu'on ne sert pas ferait mentir le sélecteur.
+
+## 2. Les quarante-sept composants éditables
+
+Quarante-huit fichiers dans `parts/`, dont `00-icons.html` qui ne porte aucun champ puisqu'il ne
+dessine rien de visible, ce qui laisse quarante-sept composants éditables, dans la fourchette de
+trente-deux à soixante-quatre demandée. Les groupes reprennent la mécanique de `groupComponents()`,
+qui replie sur `Autres` toute part sans `group`.
+
+La colonne des champs donne la clef et le type, dans la forme que la carte C1 déclare pour l'en-tête
+`<!--zrm …-->`. Une réserve à lire avant le tableau : la carte C1 ne montre qu'un seul type, `text`.
+Les types `color`, `number`, `choice`, `bool` et `image` employés ci-dessous sont une DEMANDE faite à
+C1, pas une capacité existante, et la section 6 dit ce qu'ils coûtent.
+
+| Fichier de part | Groupe | Champs éditables déclarés | Rôle |
+|---|---|---|---|
+| `00-icons.html` | Global | aucun | Planche de signes. Définit les `<symbol id="g-…">` que tous les autres composants appellent par `<use href="#g-…">`. Porte `inPage: true` comme chez T-04-1-1. |
+| `01-topbar.html` | Chrome | `query:text`, `placeholder:text`, `account:text`, `showback:bool`, `bg:color` | Barre supérieure complète : flèches d'historique, champ de recherche, pastille de compte. |
+| `02-search-field.html` | Chrome | `query:text`, `placeholder:text`, `focused:bool`, `width:number` | Le champ de recherche seul, à poser hors barre, avec son état de focus. |
+| `03-search-suggestions.html` | Chrome | `heading:text`, `items:text`, `showcovers:bool` | Liste des recherches récentes sous le champ, chaque entrée avec sa vignette. |
+| `04-account-menu.html` | Chrome | `name:text`, `items:text`, `plan:text` | Menu déroulant du compte : profil, offre, réglages, déconnexion. |
+| `05-sidebar-shell.html` | Bibliothèque | `heading:text`, `width:number`, `collapsed:bool`, `bg:color` | Cadre de la colonne de gauche : titre « Bibliothèque », bouton créer, bouton agrandir. |
+| `06-sidebar-filters.html` | Bibliothèque | `pills:text`, `active:text`, `accent:color` | La rangée de pilules de filtre. `pills` est une liste séparée par des barres verticales. |
+| `07-sidebar-toolbar.html` | Bibliothèque | `sortlabel:text`, `viewmode:choice(liste,grille,compact)` | Ligne loupe plus tri, entre les pilules et les entrées. |
+| `08-library-row.html` | Bibliothèque | `title:text`, `kind:text`, `owner:text`, `pinned:bool`, `playing:bool`, `covera:color`, `coverb:color` | L'entrée de bibliothèque avec sa pochette, son type et son propriétaire. Composant le plus posé du thème. |
+| `09-library-row-compact.html` | Bibliothèque | `title:text`, `pinned:bool`, `covera:color`, `coverb:color` | Variante de la colonne repliée : pochette seule, infobulle au survol. |
+| `10-library-grid.html` | Bibliothèque | `heading:text`, `count:number`, `columns:number` | Vue en grille de la bibliothèque, tuiles carrées. |
+| `11-sidebar-invite.html` | Bibliothèque | `title:text`, `body:text`, `cta:text` | Carte d'incitation « crée ta première liste », posée en pied de colonne. |
+| `12-sidebar-footer.html` | Bibliothèque | `links:text`, `language:text` | Mentions légales, confidentialité, cookies, sélecteur de langue. |
+| `13-cover-layered.html` | Pochettes | `back:color`, `mid:color`, `front:color`, `shape:choice(disque,arc,bandes,losange)`, `title:text`, `grain:number`, `size:number` | La pochette en trois couches SVG. Détail complet en section 4. |
+| `14-cover-mosaic.html` | Pochettes | `a:color`, `b:color`, `c:color`, `d:color`, `title:text` | Pochette de liste de lecture en quatre cases, comme lorsque quatre albums s'y agrègent. |
+| `15-cover-frame.html` | Pochettes | `radius:number`, `shadow:number`, `badge:text`, `ratio:choice(1:1,16:9)` | Cadre, ombre portée et pastille, à envelopper autour d'une pochette ou d'une image posée. |
+| `16-gradient-canvas.html` | En-tête | `topcolor:color`, `bottomcolor:color`, `angle:number`, `bloom:number`, `grain:number`, `height:number` | Le dégradé seul, texture comprise. Détail complet en section 3. |
+| `17-album-header.html` | En-tête | `kind:text`, `title:text`, `artist:text`, `year:text`, `tracks:number`, `duration:text`, `topcolor:color`, `bottomcolor:color` | En-tête d'album : grande pochette à gauche, type en petit, titre géant, ligne de méta. |
+| `18-artist-header.html` | En-tête | `name:text`, `listeners:text`, `verified:bool`, `topcolor:color`, `bottomcolor:color` | Bandeau d'artiste, image pleine largeur, pastille de vérification, auditeurs mensuels. |
+| `19-playlist-header.html` | En-tête | `title:text`, `description:text`, `owner:text`, `saves:text`, `collaborative:bool` | En-tête de liste de lecture, avec description libre et propriétaire. |
+| `20-header-meta.html` | En-tête | `owner:text`, `year:text`, `count:text`, `duration:text`, `showavatar:bool` | La seule ligne de métadonnées, extraite pour être posable sous n'importe quel en-tête. |
+| `21-command-row.html` | Commandes | `showshuffle:bool`, `showadd:bool`, `showdownload:bool`, `added:bool`, `downloaded:bool`, `accent:color` | La rangée lecture, aléatoire, ajouter, télécharger, points de suspension. |
+| `22-play-button.html` | Commandes | `size:number`, `accent:color`, `state:choice(lecture,pause)` | Le grand bouton rond seul, celui qui porte l'accent du thème. |
+| `23-view-toggle.html` | Commandes | `modes:text`, `active:text` | Bascule liste, liste compacte, grille, à droite de la rangée de commandes. |
+| `24-content-chips.html` | Commandes | `chips:text`, `active:text` | Pilules de filtrage dans le corps de page, distinctes de celles de la colonne. |
+| `25-tracklist-head.html` | Liste | `columns:text`, `showalbum:bool`, `showadded:bool` | La ligne d'en-tête du tableau : croisillon, titre, album, date d'ajout, horloge. |
+| `26-track-row.html` | Liste | `number:number`, `title:text`, `artist:text`, `album:text`, `added:text`, `duration:text`, `liked:bool`, `explicit:bool` | La rangée de piste. Composant le plus posé de la page, celui qui rend C1 indispensable. |
+| `27-track-row-playing.html` | Liste | `title:text`, `artist:text`, `duration:text`, `accent:color`, `animate:bool` | La rangée en cours de lecture : numéro remplacé par l'indicateur à barres, titre coloré. |
+| `28-track-row-compact.html` | Liste | `title:text`, `artist:text`, `duration:text`, `liked:bool` | Variante deux colonnes, pour les 9:16 où l'album et la date ne tiennent pas. |
+| `29-disc-separator.html` | Liste | `label:text`, `number:number` | Séparateur « Disque 2 » à l'intérieur d'une liste. |
+| `30-tracklist-footer.html` | Liste | `date:text`, `rights:text`, `label:text` | Pied de liste : date de sortie, mentions de droits, maison de disques. |
+| `31-album-row.html` | Liste | `title:text`, `year:text`, `kind:text`, `covera:color`, `coverb:color` | Rangée d'album dans la discographie d'un artiste. |
+| `32-artist-row.html` | Liste | `names:text`, `role:text`, `round:bool` | Rangée d'artistes en vignettes rondes, pour « avec » et « apparaît sur ». |
+| `33-card-grid.html` | Liste | `heading:text`, `cards:text`, `columns:number`, `showplay:bool` | Grille de cartes carrées, chacune avec pochette, titre et sous-titre. |
+| `34-episode-row.html` | Liste | `title:text`, `show:text`, `date:text`, `duration:text`, `summary:text`, `progress:number` | Rangée d'épisode de podcast, avec résumé et barre de progression d'écoute. |
+| `35-panel-shell.html` | Panneau | `heading:text`, `width:number`, `closable:bool`, `bg:color` | Cadre du panneau de droite : titre, bouton fermer, fond légèrement plus clair. |
+| `36-nowplaying-card.html` | Panneau | `title:text`, `artist:text`, `covera:color`, `coverb:color`, `liked:bool` | Grande pochette du morceau courant en haut du panneau, titre et artiste dessous. |
+| `37-credits-panel.html` | Panneau | `heading:text`, `performers:text`, `writers:text`, `producers:text`, `source:text` | Le bloc de crédits demandé : interprètes, auteurs, producteurs, source. |
+| `38-lyrics-panel.html` | Panneau | `lines:text`, `activeline:number`, `accent:color`, `bg:color` | Paroles défilantes, ligne courante en pleine opacité, le reste atténué. |
+| `39-queue-panel.html` | Panneau | `nowtitle:text`, `nowartist:text`, `next:text`, `heading:text` | La file d'attente : en cours de lecture, puis à suivre. |
+| `40-artist-about.html` | Panneau | `name:text`, `listeners:text`, `bio:text`, `rank:text` | Bloc « à propos de l'artiste » sous la pochette. |
+| `41-device-panel.html` | Panneau | `current:text`, `devices:text`, `connected:bool`, `accent:color` | Panneau de connexion à un appareil, liste des enceintes et téléphones. |
+| `42-player-bar.html` | Lecteur | `title:text`, `artist:text`, `elapsed:text`, `duration:text`, `progress:number`, `volume:number`, `accent:color`, `bg:color` | La barre de lecture complète du bas, les trois zones assemblées. |
+| `43-player-nowplaying.html` | Lecteur | `title:text`, `artist:text`, `liked:bool`, `covera:color`, `coverb:color` | Zone gauche seule : pochette, titre, artiste, cœur. |
+| `44-player-transport.html` | Lecteur | `state:choice(lecture,pause)`, `shuffle:bool`, `repeat:choice(non,file,piste)`, `accent:color` | Zone centrale : aléatoire, précédent, lecture, suivant, répétition. |
+| `45-player-progress.html` | Lecteur | `elapsed:text`, `duration:text`, `progress:number`, `accent:color`, `thickness:number` | La barre de progression seule, avec ses deux horodatages. |
+| `46-player-extras.html` | Lecteur | `showlyrics:bool`, `showqueue:bool`, `showdevices:bool`, `volume:number` | Zone droite : paroles, file, appareils, volume, plein écran. |
+| `47-player-fullscreen.html` | Lecteur | `title:text`, `artist:text`, `topcolor:color`, `bottomcolor:color`, `progress:number` | Mode plein écran, pochette géante et dégradé plein cadre, pensé pour le 9:16 et la vidéo. |
+
+Deux remarques sur cette découpe. D'abord elle sépare systématiquement l'ensemble et ses parties,
+`42-player-bar` d'un côté, `43` à `46` de l'autre, parce que le format commande : sur un article web
+la barre entière tient, sur un 1080 carré seule la zone de transport a du sens. Ensuite les rangées
+de piste existent en trois variantes plutôt qu'en une seule à options, parce que `26-track-row`
+sert cinq colonnes et `28-track-row-compact` deux, et qu'un composant qui masque trois colonnes sur
+cinq par des booléens produit une grille CSS impossible à tenir.
+
+## 3. Les dégradés, deux couleurs et une texture
+
+C'est la demande sur laquelle la mécanique du projet impose une contrainte précise, et il faut la
+poser avant de dessiner quoi que ce soit.
+
+`splitPart()`, dans `compile.js` aux lignes 195 à 200, retire du fichier de part l'en-tête `<!--zrm-->`
+puis EXTRAIT tous les blocs `<style>`, qu'il empile dans un tableau. `composedPage()` renvoie ensuite
+ces styles dans une unique feuille de page, et ne passe au moteur de gabarit que `part.body`, à la
+ligne 219. Conséquence directe, et elle décide de tout le reste : une valeur propre à une instance ne
+peut pas vivre dans le `<style>` d'une part, puisque le `<style>` est commun à toutes les instances
+et n'est jamais gabarité. Écrire `background:linear-gradient(var(--x), {{topcolor}})` dans la feuille
+donnerait la même couleur aux deux en-têtes posés, et en réalité ne donnerait rien du tout.
+
+La forme juste est donc de faire porter les couleurs par des propriétés personnalisées écrites en
+ligne sur l'élément racine du markup, que la feuille commune consomme :
+
+```html
+<header class="zrm-grad" style="--ga:{{topcolor}};--gb:{{bottomcolor}};--bloom:{{bloom}};--grain:{{grain}}">
+```
+
+Le moteur de gabarit échappe les valeurs par `escapeHtml`, qui touche `&`, `<`, `>`, `"` et `'`. Une
+couleur hexadécimale n'en contient aucun et traverse intacte ; une valeur écrite `rgba(0,0,0,.5)`
+aussi. En revanche une valeur qui contiendrait une apostrophe ressortirait en `&#39;` et casserait la
+déclaration, ce qui plaide pour un type `color` restreint à l'hexadécimal dans le panneau Détails.
+
+La texture, ensuite, se compose de trois couches empilées dans une seule pile de fonds :
+
+```css
+.zrm-grad{ position:relative; isolation:isolate;
+  background:
+    radial-gradient(120% 90% at 18% -20%, var(--ga) 0%, transparent 62%),
+    linear-gradient(180deg, var(--ga) 0%, color-mix(in oklab, var(--ga) 55%, var(--gb)) 46%, var(--gb) 100%);
+}
+```
+
+La rampe linéaire fait le passage d'une couleur à l'autre, le point de fusion étant calculé en oklab
+plutôt que dans l'espace par défaut, faute de quoi deux couleurs saturées passent par un gris boueux
+au milieu. La lueur radiale décentrée vers le haut à gauche produit ce que l'œil lit comme une
+lumière plutôt que comme un aplat, et c'est elle qui distingue le rendu d'un simple dégradé à deux
+arrêts. Le grain, enfin, est la troisième couche, et là un piège vérifié dans le code attend.
+
+`zrm-build-theme.mjs` refuse à la ligne 365 tout gabarit contenant `https?://`, `@import`, `fetch(`,
+`<iframe` ou `<script`. Or la façon usuelle d'obtenir un grain sans fichier consiste à écrire un
+`feTurbulence` dans une URL de données, laquelle exige un `xmlns='http://www.w3.org/2000/svg'` : la
+chaîne `http://` y figure littéralement et fait échouer la compilation du thème. Il reste deux
+sorties, dont une seule est propre. La bonne consiste à poser le `feTurbulence` en SVG EN LIGNE dans
+le markup, en position absolue derrière le contenu, sans `xmlns` puisque l'analyseur HTML le déduit,
+exactement comme `00-icons.html` pose ses symboles sans espace de noms. L'autre consiste à
+pourcent-encoder l'espace de noms dans l'URL de données, ce qui est légal mais revient à contourner
+un garde-fou par déguisement, et je ne le recommande pas.
+
+Je n'ai pas exécuté d'export, donc deux points restent des hypothèses. Le premier tient au chemin
+PNG, qui passe par `foreignObject` puis par un canevas : rien ne me garantit sans mesure qu'un
+`mix-blend-mode: overlay` posé sur le grain y soit rendu comme à l'écran, et le repli, si l'essai
+échoue, est un simple `opacity` sans mélange. Le second tient à `color-mix`, largement pris en charge
+aujourd'hui mais que je n'ai vu passer nulle part ailleurs dans le dossier `zenraymedia`, ce qui en
+ferait la première occurrence.
+
+## 4. Les pochettes en couches, et pourquoi le SVG plutôt que le PNG
+
+`13-cover-layered.html` porte un unique `<svg viewBox="0 0 400 400">` divisé en trois groupes
+nommés, dans l'ordre de la pile : `data-layer="back"` reçoit l'aplat et son halo, `data-layer="mid"`
+la forme géométrique dont le type vient du champ `shape`, `data-layer="front"` le lettrage et le
+liseré. Chaque couche tire sa couleur d'une propriété personnalisée écrite en ligne sur le `<svg>`,
+selon le même mécanisme qu'à la section précédente, si bien que trois champs de couleur suffisent à
+produire une pochette qui n'a l'air ni d'un dégradé ni d'un gabarit.
+
+Le choix du SVG contre le PNG s'appuie sur trois faits lus dans le code, et non sur une préférence.
+Le premier vient de `04-sortie.md` et se vérifie dans `exporters.js` : le chemin d'export PNG passe
+par `foreignObject` puis par un canevas, et un média distant en pixels souille ce canevas, l'erreur
+étant même nommée explicitement dans le message rendu. Une pochette dessinée en SVG dans le document
+ne pose pas ce problème, puisqu'elle n'est pas un média chargé. Le deuxième est la règle du projet
+selon laquelle le fichier livré ne contient aucun appel réseau, ce que respecte un tracé mais pas une
+image pointée. Le troisième est le format `F-print-a4`, qui rend à une densité de 3,125 : une
+pochette matricielle de 400 pixels y sortirait floue, un tracé non.
+
+`14-cover-mosaic.html` applique le même principe à quatre cases, et `15-cover-frame.html` n'est
+qu'une enveloppe, ce qui permet d'encadrer indifféremment une pochette dessinée ou une image
+réellement déposée par `attachImages`. La couche du milieu accepte quatre formes seulement, et ce
+plafond est délibéré : un champ libre de forme demanderait un éditeur de tracé, et le tableau dit
+qu'une capacité qui ajoute une attente est un recul.
+
+## 5. Les icônes, ce qui existe déjà et ce qui manque
+
+Une précision d'abord, parce qu'elle change la nature du travail. `src/components/Icon.jsx` est un
+composant React dont le dictionnaire `P` n'est pas exporté, et une part de thème est un fragment HTML
+autonome : ce fichier n'est donc pas importable dans un composant de thème. Ce qui se réutilise, ce
+sont les TRACÉS eux-mêmes, à recopier tels quels dans `00-icons.html` sous forme de
+`<symbol id="g-…" viewBox="…">`, ce qui garde un seul dessin pour deux consommateurs. Le jeu est
+homogène et documenté en tête du fichier : langage SF Symbols, boîte 24 sur 24 sauf quand un export
+réel d'Apple impose la sienne par le champ `vb`, et `currentColor` partout.
+
+Sur les quatre-vingt-onze clefs comptées, celles-ci couvrent déjà l'essentiel du besoin, et plusieurs
+sont des exports Apple réels plutôt que des approximations, ce qui vaut mieux que tout ce qu'on
+redessinerait :
+
+`play.fill`, `pause`, `forward.fill`, `backward.fill`, `shuffle`, `repeat`, `repeat.1`,
+`queue.playlist`, `speaker.wave.0`, `speaker.wave.1`, `speaker.wave.2`, `speaker.slash`,
+`airpods.pro`, `gobackward`, `goforward`, `fullscreen.enter`, `fullscreen.exit`, `pip`,
+`magnifyingglass`, `house`, `book`, `music.note`, `chevron.left`, `chevron.right`, `chevron.up`,
+`chevron.down`, `plus`, `minus`, `xmark`, `checkmark`, `ellipsis`, `heart.fill`, `star`, `clock`,
+`calendar`, `person`, `photo`, `film`, `play.rectangle`, `list.bullet`, `square.grid.2x2`,
+`rectangle.grid.1x2`, `view.align.left`, `sidebar.left`, `globe`, `lock`, `gear`, `gearshape`,
+`trash`, `tag`, `link`, `eye`, `arrow.clockwise`, `arrow.up.right`, `arrow.up.arrow.down`, `gauge`,
+`captions`, `bubble.left`, `bubble.left.fill`, `source.spotify`.
+
+Ce dernier mérite une mention à part. Son commentaire, à la ligne 80 du fichier, explique qu'il est
+volontairement DISTINCT du logo réel, une marque déposée n'étant jamais reproduite à l'identique,
+seul le sens étant repris. Cette règle vaut pour le thème entier : le mot-symbole et le logotype du
+service n'y figurent nulle part, et le vert de la marque est une valeur de token du thème, jamais une
+citation de marque.
+
+Manquent, en revanche, et il faut les dessiner ou les exporter depuis SF Symbols avant de commencer
+les parts. Je les donne par nom SF Symbols, avec ce que chacun sert :
+
+| Symbole manquant | Sert à | Composants concernés |
+|---|---|---|
+| `heart` (contour) | l'état non aimé, faute de quoi le cœur n'a qu'un état | `26`, `36`, `43` |
+| `plus.circle` | ajouter à la bibliothèque | `21` |
+| `checkmark.circle.fill` | l'état déjà ajouté | `21` |
+| `arrow.down.circle` | télécharger | `21` |
+| `arrow.down.circle.fill` | l'état téléchargé | `21`, `08` |
+| `play.circle.fill` | la variante disque du bouton de lecture | `22`, `33` |
+| `waveform` | l'indicateur de piste en cours | `27`, `39` |
+| `pin.fill` | une entrée épinglée en bibliothèque | `08`, `09` |
+| `person.crop.circle` | la pastille de compte | `01`, `04` |
+| `person.2` | les collaborateurs d'une liste | `19` |
+| `bell` | les notifications | `01` |
+| `quote.bubble` | les paroles | `38`, `46` |
+| `hifispeaker.2` | la connexion à un appareil | `41`, `46` |
+| `square.and.arrow.up` | le partage | `21`, `04` |
+
+Quatorze symboles, dont dix sont de simples variantes d'un glyphe déjà présent, ce qui rend le lot
+petit. La méthode qui a fait ses preuves dans ce fichier est écrite dans ses commentaires : partir
+d'un export CoreSVG réel fourni par Matthieu, retirer le `fill` blanc codé en dur pour hériter de
+`currentColor`, garder le `fill-opacity` d'Apple qui fait partie du dessin, supprimer le rectangle
+englobant, et poser la boîte réelle dans le champ `vb`. Les tentatives de redessin à la main ont été
+reprises deux fois pour cette raison, ce que disent les commentaires de `gobackward` et de
+`fullscreen.enter`.
+
+## 6. Ce qui bloque, et dans quel ordre
+
+Le tableau du KANBAN déclare C1 bloquante pour tout le reste, et ce thème en est la démonstration la
+plus dure du dépôt. Une liste de dix pistes, c'est dix instances de `26-track-row` : sans la fusion
+`{ ...data, ...item.props }` à la ligne 219 de `compile.js`, les dix affichent le même titre, la même
+durée et le même artiste. Un thème de presse s'en accommode à peu près, puisqu'une une ne répète pas
+son titre ; un client musical est fait de listes, et il ne rend donc rien du tout avant C1.
+
+Trois autres obstacles se lisent dans le code et ne figurent pas au tableau, ce qui ne veut pas dire
+qu'ils soient graves, seulement qu'ils sont à connaître avant d'ouvrir un fichier.
+
+Le registre produit par `zrm-build-theme.mjs`, aux lignes 194 à 202, ne recopie que sept clefs :
+`id`, `name`, `group`, `role`, `reference`, `file`, `standalone`. Une déclaration `props` posée dans
+l'en-tête d'une part serait donc parsée puis silencieusement perdue à la génération, et C1 exige de
+ce fait une modification de ce script, ce que `02-modele.md` avait déjà relevé.
+
+`componentCatalog.js` importe les six `tokens.css` en statique, dans un objet `tokenSheets` indexé
+par identifiant, aux lignes 5 à 21. Un septième thème n'aura pas ses tokens tant qu'on n'aura pas
+ajouté sa ligne, ou tant qu'on n'aura pas fait passer ce chargement par `import.meta.glob` comme les
+registres et les parts juste au-dessus. Deux lignes de code, mais sans elles le thème s'affiche sans
+aucune couleur, et le symptôme ne dit pas sa cause.
+
+La grille de rangée, enfin, vaut `repeat(auto-fit, minmax(min(100%,220px),1fr))` à la ligne 245 de
+`compile.js`, et les éléments portent `overflow:hidden`. Poser la colonne latérale, le corps et le
+panneau de droite comme trois composants d'une même rangée leur donnerait trois fractions égales,
+alors que l'interface réelle est asymétrique. Chaque cadre du thème, `05`, `35`, doit donc porter sa
+propre largeur en champ éditable, ce que le tableau prévoit, et il ne faut pas compter sur la
+composition pour la lui donner.
+
+Un mot pour finir sur la règle des couleurs. `src/config/colors.js` régit l'interface de
+ZenRayProgress, et sa règle est celle de `chunkPolicy.js` : aucune couleur d'interface ailleurs. Un
+thème, lui, porte sa palette dans son `tokens.css`, comme le font les six thèmes existants, et
+l'équivalent de la règle à l'intérieur d'un thème consiste à n'écrire aucune couleur dans une part.
+Cette règle-là n'est aujourd'hui pas tenue : `parts/21-cards.html` de T-04-1-1 contient `#e8b93f`,
+`rgba(140,195,240,.6)` et plusieurs autres valeurs en dur, que j'ai lues. Le thème de streaming peut
+la tenir dès le premier fichier, ce qui coûte moins cher que de la rattraper ensuite.

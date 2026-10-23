@@ -1,0 +1,268 @@
+# ZenRayMedia, anatomie de la sortie
+
+Ce document décrit ce que la sortie de ZenRayMedia fait réellement, à partir des fichiers lus, et
+seulement d'eux. Fichiers lus intégralement : `src/zenraymedia/exporters.js` (202 lignes),
+`src/zenraymedia/critic.js` (254), `src/zenraymedia/formats.js` (105), `src/zenraymedia/htmlTemplate.js`
+(117), `src/zenraymedia/compile.js` (352), `src/zenraymedia/forge.js` (133). Lus partiellement, et
+signalés comme tels à chaque fois qu'ils portent une affirmation : `src/zenraymedia/fonts.js`
+(3172 lignes, dont j'ai lu l'en-tête, les 7 exports et la queue, pas les 3100 lignes de données),
+`src/zenraymedia/MediaApp.jsx` (lu par blocs autour des appels d'export et de la mesure),
+`src/zenraymedia/publish.js` (40 premières lignes), `src/zenraymedia/themes/registry.js` (bloc
+`htmlThemeShell`), `src/zenraymedia/contracts.js` (bloc `validateTheme`). Le fichier
+`src/zenraymedia/formats.js` existe bien, contrairement à ce que la formulation « si présent » de la
+commande laissait ouvert.
+
+---
+
+## 1. Les formats d'export réellement implantés
+
+Il faut distinguer deux notions que le code sépare nettement et que le vocabulaire courant confond.
+Un **format** au sens de `formats.js` est une boîte de sortie, c'est-à-dire un canevas, une densité
+typographique, des zones de sécurité et une spécification de livraison ; un **exporteur** au sens
+d'`exporters.js` est une fonction de navigateur qui produit un fichier. Sept formats existent, quatre
+exporteurs seulement, et la correspondance entre les deux n'est pas totale.
+
+Les sept formats, tous déclarés dans le tableau `FORMATS` (`formats.js` L18 à L76), portent chacun
+un champ `delivery.container` qui annonce le conteneur attendu :
+
+| Identifiant | Canevas | Densité | Conteneur annoncé | Exporteur réel |
+|---|---|---|---|---|
+| `F-web-article` | 820 × libre, 72 dpi | 1 | `html` | `exportHtml` |
+| `F-still-1080-square` | 1080 × 1080 | 1.7 | `png` | `exportPng` |
+| `F-still-1080x1350` | 1080 × 1350 | 1.7 | `png` | `exportPng` |
+| `F-still-1080x1920` | 1080 × 1920 | 1.7 | `png` | `exportPng` |
+| `F-print-a4` | 2480 × 3508, 300 dpi | 3.125 | `pdf` | `exportPdf` |
+| `F-video-1920x1080` | 1920 × 1080, 30 i/s | 1.6 | `mp4` HEVC `hvc1` | aucun, plan textuel seulement |
+| `F-overlay-1920x1080` | 1920 × 1080, 30 i/s | 1.6 | `mov` ProRes 4444 alpha | aucun, plan textuel seulement |
+
+Ce qui marche vraiment se réduit donc à quatre gestes, tous dans `exporters.js` et tous appelés
+depuis `runExport` (`MediaApp.jsx` L285 à L319) : la page HTML autonome (L297), l'image PNG (L301),
+le PDF par la boîte d'impression (L305) et la copie du texte brut au presse-papiers (L309). Aucun de
+ces quatre appels ne passe si le Critique signale un défaut bloquant, la garde étant posée en tête
+de fonction (L290) avec un commentaire qui rappelle qu'une version antérieure exemptait justement
+l'export HTML, soit le livrable principal.
+
+Ce qui est partiel se répartit en trois cas distincts, et la nuance compte.
+
+Le PDF n'est pas produit par le programme : `exportPdf` (`exporters.js` L161) fabrique une iframe
+invisible, y injecte la page, attend `document.fonts.ready` puis 120 ms, et appelle `print()`. Le
+fichier dépend ensuite entièrement de ce que l'utilisateur choisit dans la boîte du système, ce que
+le message d'interface assume d'ailleurs explicitement (« choisis Enregistrer au format PDF »,
+`MediaApp.jsx` L308). Il en résulte qu'aucun contrôle programmatique ne s'exerce sur les marges, le
+fond perdu de 3 mm déclaré par le format (`formats.js` L52) ou le plafond de 30 Mo annoncé par
+`delivery.maxBytes` : ces trois valeurs sont documentaires et, autant que j'aie pu le voir, aucune
+n'est lue ailleurs dans les fichiers que j'ai ouverts.
+
+Les deux formats temporels ne produisent aucun fichier depuis l'application. `forge.js` assume la
+décision dès son en-tête, en la chiffrant : une image RGBA 4K pèse 33,18 Mo, soit environ 29,9 Go
+pour trente secondes à trente images par seconde, et les fonctions serverless du projet plafonnent à
+environ 4,5 Mo de réponse. La Forge se contente donc d'émettre un plan (`forgePlan`, L100), une
+commande ffmpeg dérivée de `format.delivery` (`ffmpegCommand`, L18), une commande de sonde
+(`probeCommand`, L35) et un script Node complet à coller dans `Scripts/` (`renderScript`, L45). Ce
+plan n'apparaît d'ailleurs que si le format est temporel, la mémoïsation de `MediaApp.jsx` L321
+retournant `null` sinon. Dit autrement, la vidéo et l'habillage alpha sont des recettes vérifiables,
+pas des sorties.
+
+Le dernier cas est celui du plafond de poids. Chaque format déclare un `delivery.maxBytes`, mais je
+n'ai trouvé aucune comparaison entre ce plafond et la taille réellement produite par `exportHtml` ou
+`exportPng`, alors que ces deux fonctions retournent bien un champ `bytes` (L105 et L156) et que
+`MediaApp.jsx` le journalise (L299, L303). Le contrôle de poids qui existe porte sur les entrées, pas
+sur la sortie : `critic.js` avertit au-delà de 6 Mo d'images encodées dans le document (L143) et
+au-delà de 1,5 Mo de polices (L160).
+
+---
+
+## 2. Comment le HTML autonome est produit, et comment les polices y entrent
+
+La page part de `compile()` (`compile.js` L291), qui possède trois voies d'écriture distinctes et
+les essaie dans cet ordre. Dès qu'une composition Lego contient au moins une pièce, `composedPage`
+(L203) assemble les fragments de composants ligne par ligne et devient la source. Sinon, si le thème
+apporte un gabarit HTML déposé à la main, `renderTemplate` le remplit (L309). Sinon seulement, la
+voie historique à jetons produit la page par `themeCss` (L86) et `beatsHtml` (L181). Les trois voies
+retournent une chaîne complète avec `<!doctype html>` et un `<style>` en tête, sans aucun appel
+réseau autre que les fichiers de police.
+
+Le moteur de gabarit vit dans `htmlTemplate.js` et se limite volontairement à quatre constructions,
+`{{champ}}` échappé, `{{{champ}}}` brut, une section répétée `{{#beats}}` et une section négative
+`{{^beats}}`. L'analyseur descend en une passe unique avec sa portée (`renderScope`, L40), et le
+commentaire des lignes 30 à 37 raconte le bug corrigé le 2026-07-25, quand une résolution en deux
+temps vidait `{{role}}` et `{{text}}` à l'intérieur d'un bloc de beats. Une section jamais fermée est
+ignorée sans exception ni boucle (L71), et la profondeur d'imbrication est bornée à seize (L41).
+
+Reste la question des polices, qui est le vrai point d'autonomie. Deux mécanismes coexistent, et
+c'est délibéré. Pendant l'aperçu, `compile.js` écrit dans la page un bloc `FONT_FACES` (L24) qui
+pointe vers `/fonts/…` pour les trois familles Anthropic, complété par `fontFaceCss(theme.fonts)`
+(L109 et L239) qui pointe vers `/zrm-fonts/…` pour les familles Google installées. À l'export,
+`embedFonts` (`exporters.js` L63) ajoute un second bloc `<style data-zrm-fonts>` juste avant
+`</head>`, contenant les mêmes familles mais en `data:font/woff2;base64`. Comme il est inséré après,
+il gagne en cascade, et le fichier livré ne dépend plus du réseau. La conversion passe par un
+découpage en tranches de 0x8000 octets avant `btoa` (L33 et L52), précaution qui évite le dépassement
+de pile d'un `String.fromCharCode` appliqué à un tableau entier, et chaque fichier est mis en cache
+dans une `Map` de promesses (L21).
+
+Le choix des familles à embarquer se fait par une simple recherche de sous-chaîne dans le HTML
+(`html.includes(family)`, L67 et L76), ce qui a deux conséquences qu'il vaut mieux connaître. La
+première est bénigne : une famille seulement citée dans un commentaire serait embarquée pour rien.
+La seconde l'est moins, car pour chaque famille Google retenue, la boucle L77 embarque **toutes** ses
+coupes, italiques, graisses et sous-ensembles Unicode compris, avec leur `unicode-range` respectif.
+Le commentaire L72 justifie ce choix, sans lequel l'accentuation casserait, mais il explique aussi
+pourquoi le seuil d'alerte de 1,5 Mo posé par le Critique se déclenche facilement : d'après l'en-tête
+et les entrées que j'ai lues dans `fonts.js`, une seule famille comme Source Serif 4 déclare 1 655 580
+octets répartis sur trente-deux fichiers.
+
+Un écart de fidélité apparaît ici, et je le donne comme une observation vérifiable plutôt que comme
+un diagnostic complet, faute d'avoir suivi son effet à l'écran. La table `FONT_FILES` d'`exporters.js`
+(L10 à L14) ne connaît que trois fichiers, `AnthropicSerif-Romans.woff2`, `AnthropicSans-Romans.woff2`
+et `AnthropicMono.woff2`, alors que `compile.js` en déclare quatre pour l'aperçu, italiques comprises
+(L26 et la ligne suivante), et que `public/fonts/` contient bien `AnthropicSerif-Italics.woff2` et
+`AnthropicSans-Italics.woff2`, que j'ai listés. Or la voie à jetons met en italique le texte des beats
+de rôle `turn` (`compile.js` L157). Il en découle, sauf effet que je n'ai pas mesuré, qu'un tel
+passage s'affiche en italique véritable dans l'aperçu et en italique synthétique dans le fichier
+exporté, puisque la coupe italique n'y est pas embarquée. C'est exactement le genre d'écart que la
+règle du projet, aperçu identique à la sortie, cherche à interdire.
+
+---
+
+## 3. Ce que fait le Critique
+
+`critic.js` se présente comme le seul poste obligatoire du cycle, et le code tient cette promesse
+puisque `runExport` refuse tout livrable dès qu'un défaut bloquant existe. Le module sépare deux
+familles de contrôles, les statiques qui travaillent sur les données et les mesurés qui travaillent
+sur le document réellement rendu dans l'iframe d'aperçu.
+
+Le socle colorimétrique est écrit à la main et conforme à WCAG. `channelLuminance` (L47) applique le
+seuil 0.03928 et l'exposant 2.4, `relativeLuminance` (L52) pondère en 0.2126 / 0.7152 / 0.0722, et
+`contrastRatio` (L63) renvoie le rapport arrondi au centième. Le point qui mérite d'être noté est
+`composite` (L58), qui compose une couleur semi-transparente sur son fond avant de la mesurer : sans
+lui, un `rgba(20,22,26,.56)` sur blanc serait pris pour du quasi-noir et le contraste annoncé serait
+faux. Le test de `zenraymedia.test.js` L437 vérifie les bornes 21 et 1 et compare précisément ce cas
+transparent.
+
+Les contrôles statiques d'`inspectStatic` (L75) commencent par valider les quatre objets et
+retournent immédiatement si l'un d'eux est mal formé, au motif qu'il est inutile de mesurer une
+structure invalide (L83). Viennent ensuite, avec leurs seuils réels : la phrase unique du message,
+bloquante (L86) ; le contraste de l'encre sur le fond au seuil `theme.palette.minContrast`, dont la
+valeur par défaut est 4,5 et qui est bloquant en dessous (L94 à L99) ; le contraste du texte
+secondaire, simple avertissement sous 4,5 (L102) ; la déclaration du format par le thème (L107) ; le
+nombre de beats face aux bornes `theme.beatCount` (L113) ; la durée, avertissement au plancher et
+blocage au plafond du format (L118 à L122) ; les mentions obligatoires absentes du contenu, bloquantes
+(L126) ; les blocs non affichés par le format, en information et non en défaut (L134) ; le poids des
+images encodées au-delà de 6 000 000 octets (L143) ; le nombre d'images rapporté au nombre de blocs
+sur un format web (L147) ; les familles de polices absentes du registre (L154) et leur poids cumulé
+au-delà de 1 500 000 octets (L160) ; les beats de moins de trois mots (L167) ; enfin l'absence de
+beat d'appel quand l'intention est de vendre ou de convaincre (L172).
+
+Les contrôles mesurés d'`inspectRendered` (L181) reçoivent le document de l'iframe et ne travaillent
+que sur des `getBoundingClientRect` et des `getComputedStyle`. Le débordement vertical se mesure
+contre la hauteur **utile**, canevas moins zones de sécurité, et non contre le `body` : le commentaire
+des lignes 191 à 195 explique que le cadre centre son contenu avec `overflow:hidden`, si bien qu'un
+contenu trop haut se fait rogner symétriquement sans que le `scrollHeight` du corps ne bouge. La
+tolérance est de deux pixels dans les deux axes (L201 et L205), et les deux défauts sont bloquants
+avec la réparation `shrink`. Les zones de sécurité sont ensuite vérifiées élément par élément sur
+cinq sélecteurs, `.zrm-title`, `.zrm-beat-text`, `.zrm-standfirst`, `.zrm-byline`, `.zrm-kicker`, avec
+une tolérance d'un pixel et un arrêt au premier défaut (L214 à L220). Le plancher de lisibilité vaut
+douze pixels sur un format libre et, sur un canevas fixe, le maximum entre douze et 1,1 % de la
+hauteur du canevas (L225), ce qui donne par exemple vingt-et-un pixels sur un 1080 × 1920. La dernière
+règle repère la ligne veuve, un mot de trois caractères au plus terminant seul un paragraphe d'au
+moins huit mots, en information seulement (L235 à L243).
+
+Ces mesures ne se contentent pas de parler : elles pilotent une correction. Dans `MediaApp.jsx`
+(L253 à L264), la détection d'un débordement ou d'une entrée en zone de sécurité fait descendre le
+contenu d'un cran sur l'échelle discrète `SHRINK_LADDER` de `compile.js` (L45, sept paliers de 1 à
+0,54), puis recompile, jusqu'au plancher `MIN_SHRINK`, soit six rendus au pire. Le commentaire
+associé rappelle la raison, à savoir un défaut réel où la page dépassait de 886 pixels parce que
+l'échelle était estimée au lieu d'être mesurée. La valeur retenue repart dans `meta.scale`, donc
+l'export utilise exactement celle de l'aperçu (`compile.js` L295 à L298).
+
+`summarize` (L249) clôt le module en séparant bloquants, avertissements et informations, et en posant
+`canPublish` à vrai quand aucun bloquant ne subsiste.
+
+---
+
+## 4. Y a-t-il de l'animation dans le code ?
+
+**Oui, mais pas celle qu'on croit, et pas là où il faudrait pour une sortie animée.** Je réponds oui
+parce que trois traces existent réellement, et je précise aussitôt qu'aucune ne constitue une
+timeline éditable.
+
+La première trace est une animation d'entrée dans la page compilée. `compile.js` L164 à L169 émet,
+sous condition `theme.motion.enabled` et sous `prefers-reduced-motion: no-preference`, une règle
+`.zrm-beat{animation:zrm-in …}`, vingt-quatre délais échelonnés d'après `theme.motion.stagger`, et un
+`@keyframes zrm-in` qui passe d'une opacité nulle et d'un décalage vertical de dix pixels à l'état
+neutre. La voie Lego possède l'équivalent, `zrm-lego-in` en 0,3 seconde avec
+`cubic-bezier(.2,.75,.2,1)` et deux délais codés en dur (L250 à L254). Il faut cependant noter que
+cette animation ne se déclenche nulle part aujourd'hui : le contrat de thème range `motion` parmi les
+groupes facultatifs (`contracts.js` L104 à L106), le gabarit par défaut des thèmes HTML pose
+`enabled: false` (`themes/registry.js` L133), et le seul thème à jetons que j'aie lu, `T-01-3-2.theme.js`
+L67 à L74, pose lui aussi `enabled: false` avec un commentaire qui en fait une décision et non un
+oubli. Une recherche de `enabled: true` sur tout `src/zenraymedia/` ne renvoie rien.
+
+La deuxième trace est le vocabulaire du mouvement dans le modèle. Un thème déclare `ease`, `enter`,
+`stagger` et `cut`, et un beat porte un `tempo` parmi `still`, `calm`, `drive` et `snap` dont
+`beatDuration` (`formats.js` L101) tire une durée déterministe par la base `TEMPO_BASE` modulée par
+le poids. Ces valeurs alimentent la durée totale d'un cut (`durationOf`, L91) et le contrôle de durée
+du Critique, mais elles ne décrivent le mouvement d'aucun élément.
+
+La troisième trace, et de loin la plus intéressante, est l'horloge virtuelle de la Forge. Le script
+généré par `renderScript` met en pause toutes les animations du document par
+`document.getAnimations()` puis positionne leur `currentTime` image par image à `t = n/fps`
+(`forge.js` L82 et L86), ce qui rend la capture indépendante de l'horloge réelle et garantit qu'une
+même page rejouée produit le même fichier, empreinte sha256 comprise. Le test `zenraymedia.test.js`
+L638 vérifie que le script contient bien cet appel.
+
+Il faut donc conclure ainsi. Le **mécanisme de capture** d'une animation existe et il est correct ;
+la **matière** à capturer, elle, se limite aujourd'hui à un fondu d'entrée désactivé partout. Il
+n'existe dans `src/zenraymedia/` aucune timeline, aucune piste, aucun éditeur de keyframes, aucune
+courbe d'interpolation modifiable, aucun modèle de propriété animée dans le temps, et aucune notion
+de scène ou de plan. La preuve la plus honnête vient du projet lui-même : le composant `32-effects`
+du thème T-04-1-1 énumère huit effets, tous statiques, et écrit noir sur blanc qu'il ne reproduit ni
+l'ondulation des voiles, ni le balayage de la vague, ni la pulsation des halos, parce que ce sont des
+animations, laissées vides dans l'inventaire au type `motion`. Une véritable animation est donc une
+fonctionnalité à créer de zéro, sur un socle de capture déjà prêt.
+
+---
+
+## 5. L'export PNG, ce qui existe et ce qui manque pour être fidèle
+
+`exportPng` (`exporters.js` L111) emprunte le chemin classique du navigateur, à savoir un `<svg>`
+contenant un `<foreignObject>` où l'on importe les styles et le corps de la page, puis une
+sérialisation, un chargement en `Image`, un dessin sur `<canvas>` et un `toBlob('image/png')`. Deux
+détails y sont bien traités. La sérialisation passe par `DOMParser` puis `XMLSerializer` sur un DOM
+importé nœud par nœud (L116 à L134), ce que le commentaire justifie par la nécessité d'un XHTML bien
+formé, une concaténation de chaînes cassant au premier `<br>`. Et l'échec de chargement porte un
+message qui nomme la cause la plus fréquente, un média distant dans un emplacement (L140), cause
+réelle puisque `MediaApp.jsx` L326 à L330 explique que les images déposées sont converties en WebP
+puis stockées en `dataURL` précisément pour ne pas souiller le canevas.
+
+Ce qui manque pour un export fidèle se compte, et chaque point est vérifiable dans le code.
+
+Le rendu est fixé à un pixel pour un pixel. Le paramètre `scale` existe bien dans la signature
+(L111) et sert à multiplier les dimensions du canevas (L145), mais l'unique appel de l'application ne
+le passe pas (`MediaApp.jsx` L302), si bien qu'un carré 1080 sort à 1080 et qu'aucun tirage à deux ou
+trois fois la définition n'est accessible depuis l'interface.
+
+Le fond est toujours opaque. Les lignes 148 et 149 remplissent le canevas en `#ffffff` avant le
+dessin, sans condition. Un thème sombre reste correct puisqu'il peint son propre fond, mais le format
+`F-overlay-1920x1080`, qui déclare pourtant `transparent: true` (`formats.js` L74) et une couche
+alpha réelle en ProRes, ne peut produire aucun PNG à fond transparent. La transparence n'existe que
+dans le script de la Forge, via `omitBackground` (`forge.js` L87).
+
+La hauteur d'un format libre est arbitraire. La ligne 113 pose `format.canvas.h || 1200`, or
+`F-web-article` déclare précisément `h: 0` pour signifier une hauteur libre. Exporter un article web
+en PNG produit donc une image de 1200 pixels de haut qui coupe l'article à cet endroit, sans que rien
+ne le signale, puisque le Critique ne mesure les débordements que sur les formats à canevas fixe
+(`critic.js` L188 et L196).
+
+Le `foreignObject` n'exécute aucun script et ne charge aucune ressource externe. Cela ne pose pas de
+problème aujourd'hui, les six thèmes HTML du dossier ne contenant aucune balise `<script>`, ce que
+j'ai vérifié par comptage, mais c'est une contrainte structurelle qui interdira toute pièce dont le
+rendu dépendrait de JavaScript.
+
+Enfin, deux points que je signale comme des hypothèses à mesurer, faute d'avoir exécuté l'export.
+D'abord, les polices sont embarquées en base64 avant la sérialisation (L114), ce qui est la bonne
+approche pour le `foreignObject`, mais rien dans la fonction n'attend `document.fonts.ready` ni ne
+laisse un délai au décodage, contrairement à `exportPdf` qui le fait explicitement (L171 et L172) ;
+il se peut donc qu'un rendu se produise avant que toutes les coupes soient posées. Ensuite, l'image
+est dessinée par un `drawImage` unique qui met à l'échelle en une passe (L150), sans lissage
+paramétré, ce qui peut différer du rendu natif sur les textes fins, mais je n'ai pas de mesure pour
+l'affirmer.

@@ -1,0 +1,323 @@
+# Anatomie de l'éditeur ZenRayMedia, tel qu'il existe aujourd'hui
+
+Document d'observation, pas de proposition. Il décrit ce que fait `src/zenraymedia/MediaApp.jsx`
+(1158 lignes, lu en entier) et `src/zenraymedia/media.css` (371 lignes, lu en entier), avec les
+numéros de ligne pour que chaque affirmation se vérifie. Ce qui n'a pas été lu est signalé comme
+tel : je n'ai ouvert de `compile.js` et de `composition.js` que les passages nécessaires pour
+trancher entre « câblé » et « affiché mais mort », et je le dis à chaque fois.
+
+---
+
+## 1. Les zones de l'interface
+
+La grille est déclarée dans `media.css` L7 à L22, sur le conteneur `.zrm-shell`, et l'application
+la rend avec `data-panes="three"` (`MediaApp.jsx` L647). Trois colonnes, trois rangées :
+
+```
+grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(235px, 275px);
+grid-template-rows:    auto  minmax(0, 1fr)  minmax(205px, 27vh);
+```
+
+La première rangée, `auto`, est occupée par la barre de commande, qui traverse toute la largeur
+(`.zrm-bar { grid-column: 1 / -1 }`, `media.css` L60). La troisième rangée, de 205 px à 27 % de la
+hauteur, revient à la bibliothèque, qui traverse elle aussi toute la largeur (`.zrm-library`,
+`media.css` L258). Entre les deux, la rangée souple porte les trois colonnes. Il n'y a pas de
+composant de mise en page intermédiaire : les cinq sections sont des enfants directs du `div`
+racine, et c'est la grille CSS seule qui les place. Tout est rendu par la fonction unique
+`MediaApp()`, aucun sous-composant n'est extrait, à la seule exception de `CreateBrowser`
+(`src/zenraymedia/CreateBrowser.jsx`, importé L27, monté L904) et de `Icon`
+(`src/components/Icon.jsx`, importé L13).
+
+### Le haut, barre de commande, L649 à L683
+
+Un champ de recherche unique (L651) alimente une palette d'actions, avec le raccourci `⌘K`
+(L469 à L481) et une navigation flèches plus Entrée (L657 à L661). Suivent un sélecteur de brief
+courant (L664), puis quatre boutons d'icône : ouvrir depuis Create, enregistrer, nouveau brief,
+dupliquer, supprimer (L667 à L671). La palette elle-même se dessine en absolu sous la barre
+(`media.css` L70 à L83) et liste au maximum neuf entrées à vide, douze en recherche (L463 à L464).
+
+La liste de commandes est construite L436 à L459 : seize actions nommées, puis une entrée par
+format (L455) et une entrée par thème (L456). Comme `themes` vaut aujourd'hui la liste réellement
+construite et non les 1024 du catalogue, la palette reste courte, mais rien dans le code ne la
+borne si le catalogue grossit.
+
+### La gauche, section « Structure », L691 à L825
+
+Une seule colonne qui empile quatre choses de nature différente, dans cet ordre.
+
+D'abord la structure Lego (L701 à L742) : un en-tête qui compte les éléments via `countItems`
+(L702), puis les lignes de la composition, chacune rendue en grille auto-ajustée
+(`.zrm-structure-row`, `media.css` L197). Chaque élément porte son nom, son groupe, et quatre
+boutons d'action au survol : masquer, verrouiller, dupliquer, retirer (L733 à L736).
+
+Ensuite le contenu de l'article : titre, message d'une phrase, public (L745 à L761), chacun lié à
+`patchBrief` et affichant l'erreur de validation correspondante par `errorFor` (L642).
+
+Puis les blocs du Cut (L771 à L813). Chaque bloc porte un sélecteur de rôle (L779), un compteur
+`i+1/total` avec la durée quand le format est temporel (L782 à L785), un `textarea` de texte
+(L787), une bande de vignettes d'images (L788 à L797) et sept actions : joindre une image, monter,
+descendre, fusionner, scinder, insérer, retirer (L798 à L811).
+
+Enfin, replié dans un `<details>` (L815 à L823), le champ de notes source, avec « Monter
+l'article » et « Notes d'exemple ».
+
+### Le centre, section « Aperçu », L828 à L876
+
+L'en-tête affiche les dimensions du canevas, la durée si le format est temporel, l'échelle de
+contenu appliquée et le nombre de blocs montrés sur le total (L832 à L837), puis deux bascules :
+clair/sombre et zones de sécurité (L838 à L845).
+
+Le corps (L848) rend une `iframe` en `srcDoc` (L857 à L864), avec le HTML compilé passé par un
+`useDebounced` de 220 ms (L219). Le point à retenir est que l'iframe garde la taille RÉELLE du
+canevas et que seul un `transform: scale(fitScale)` la réduit à l'écran, choix expliqué en commentaire
+L51 à L53 : redimensionner l'iframe fausserait les mesures du Critique, qui se font en pixels de
+sortie. Le calque de zones de sécurité, quand il est actif, se pose en surimpression avec quatre
+bandes calculées depuis `format.safe` (L865 à L872).
+
+### La droite, le Deck, L879 à L1066
+
+Six onglets déclarés L33 à L40 : Create, Sorties, Thèmes, Critique, Forge, Journal. Un seul est
+visible à la fois, l'onglet actif tenant dans `deckTab` (L83). Create héberge le fil d'Ariane
+`CreateBrowser` et la carte de publication (L888 à L918) ; Sorties déplie l'arbre de déclinaisons
+et permet de changer de format d'un clic (L920 à L962) ; Thèmes liste les thèmes groupés par
+famille, repliables (L964 à L1002) ; Critique affiche le verdict et les défauts, avec un bouton
+« Corriger » quand le défaut porte un `fix` (L1004 à L1023) ; Forge affiche la commande d'encodage
+et les étapes pour les formats temporels (L1025 à L1051) ; Journal liste les livrables produits
+(L1053 à L1064).
+
+### Le bas, bibliothèque et barre de rendu, L1069 à L1153
+
+Trois onglets, Composants, Images, Icônes (L1072 à L1078), un champ de recherche (L1080 à L1085),
+et à droite le nom de la famille et du thème courant (L1086). Le corps défile horizontalement :
+les composants sont regroupés en colonnes repliables (L1107 à L1130), les images en vignettes
+(L1094 à L1104).
+
+La barre de rendu, en pied de la même section (L1134 à L1152), porte les sept pastilles de format
+(L1136 à L1140), une barre de progression quand une tâche est en cours, puis Copier le texte, PDF
+ou Image PNG selon le type de format, Fichier HTML, et le bouton bleu Publier. Tout à droite, le
+compteur d'actions (L1151), qui matérialise la « règle des trois actions » annoncée en tête de
+fichier L8.
+
+---
+
+## 2. Ce qui est réellement câblé, et ce qui ne l'est pas
+
+### Câblé, avec effet mesurable
+
+Les champs du brief écrivent dans le projet par `patchBrief` (L140 à L142), qui appelle
+`patchProject` (L132 à L138), lequel persiste immédiatement par `saveProjects`. Le rendu suit,
+puisque `compiled` dépend de `project` (L209 à L217).
+
+Toutes les manipulations de blocs passent par `withCut` (L277), qui applique la fonction de
+`cut.js` et incrémente le compteur d'actions. Monter, descendre, fusionner, scinder, insérer,
+retirer, changer le rôle, changer le texte : chacune produit un nouvel objet Cut, donc un nouveau
+rendu.
+
+Les images jointes à un bloc passent par `attachImages` (L331 à L348), qui encode en WebP par
+`fileToWebp` avec 1400 px de côté long et une qualité de 0,82, puis stocke une dataURL. Le
+commentaire L326 à L330 explique le choix : une adresse distante souillerait le canevas et ferait
+échouer l'export PNG.
+
+La structure Lego est câblée dans les deux sens. Ajouter par clic fonctionne
+(`addLibraryComponent` L582, `addLibraryImage` L588) ; ajouter par glisser depuis la bibliothèque
+fonctionne (`onStructureDrop` L610 à L625, qui lit trois types MIME distincts) ; déplacer une
+instance existante fonctionne par le même chemin, branche `instanceId` L616 ; poser dans une
+structure vide fonctionne (`onEmptyStructureDrop` L627 à L636). Le placement est calculé
+géométriquement par `placementAt` (L594 à L601), qui découpe la cible en quatre : le quart haut
+donne `above`, le quart bas `below`, et entre les deux la moitié gauche donne `left`, la droite
+`right`. Les quatre boutons par élément écrivent tous par `patchComposition` (L733 à L736).
+
+Masquer un élément a un effet vérifiable sur le rendu : `compile.js` L212 fait `if (item.hidden)
+continue`. Verrouiller n'agit, lui, que sur l'interface, par `draggable={!item.locked}` (L718) ;
+je n'ai trouvé aucune lecture de `locked` dans `compile.js` par la recherche que j'ai lancée, et
+je n'ai pas lu le fichier en entier, donc je le donne comme observation et non comme preuve
+complète.
+
+Les exports (L285 à L319) produisent un fichier et écrivent une ligne de journal. Le garde-fou du
+Critique s'applique à TOUS les livrables sans exception, correctif signé ZM-L11-09 en commentaire
+L287 à L289. Enregistrer et ouvrir dans Create fonctionnent, avec gestion du `sha` pour refuser
+une écriture concurrente (L102 à L104, L354 à L364). `⌘S` est câblé L393 à L402. L'ouverture
+depuis Create par double-clic écoute l'événement `zr:media-open` (L385 à L389).
+
+Publier écrit la page, l'indexe, copie l'adresse et bascule le Deck sur Create (L410 à L433).
+
+La boucle d'ajustement mesuré mérite d'être signalée parce qu'elle est le contraire d'une
+estimation : `onFrameLoad` (L243 à L268) attend `doc.fonts.ready`, mesure le rendu réel par
+`inspectRendered`, et si la page déborde vraiment, descend d'un cran d'échelle et recompile. Le
+commentaire L253 à L256 date le correctif du 2026-07-25 et borne la boucle à six rendus par le
+plancher `MIN_SHRINK`.
+
+### Affiché mais mort, ou partiellement mort
+
+La sélection d'un élément de structure n'a presque aucune conséquence. `setSelectedComponent`
+(L722) ne sert qu'à trois choses : la mise en évidence visuelle (`data-on` L719, style
+`media.css` L204), la révélation des boutons d'action au survol (`media.css` L215), et la cible
+par défaut d'un ajout ultérieur (L582 et L588, paramètre `targetId = selectedComponent`).
+Sélectionner n'ouvre aucun panneau, ne montre aucune propriété. C'est très exactement ce que la
+carte C1 du KANBAN décrit comme manquant, et le constat se vérifie ici.
+
+Les propriétés d'instance existent dans le modèle mais ne sont jamais écrites par l'interface.
+`composition.js` initialise `props: {}` à trois endroits (L28, L54, L71, ce dernier avec
+`{ fit: 'cover', radius: 18, ratio: '16 / 9' }` pour une image). `compile.js` L214 LIT bien
+`item.props?.ratio` et `item.props?.radius` pour une image. En revanche, pour un composant,
+`compile.js` L221 fait `renderTemplate(part.body, data)` où `data` est global au document : les
+`props` de l'instance ne sont pas fusionnées. Aucun appel de `patchItem` dans `MediaApp.jsx`
+n'écrit `props` ; les trois appels existants n'écrivent que `hidden` (L733), `locked` (L734) et
+rien d'autre. Le KANBAN dit « personne ne l'écrit et personne ne le lit » ; la mesure nuance ce
+point sur un seul cas, l'image, dont deux propriétés sont lues mais restent inatteignables faute
+de champ pour les saisir.
+
+L'aperçu est en lecture seule. `compile.js` L214 et L227 écrivent bien `data-zrm-instance` sur
+chaque pièce rendue, mais aucun `addEventListener` sur le document de l'iframe n'existe dans
+`MediaApp.jsx` en dehors de `onFrameLoad`, qui ne fait que mesurer. Cliquer dans l'aperçu ne
+sélectionne rien.
+
+Le compteur d'actions (L1151) s'incrémente à chaque geste mais ne déclenche, ne bloque et ne
+signale jamais rien. Il informe, il ne régule pas.
+
+L'onglet Icônes filtre par une expression régulière sur le nom, `/icon/i` testée sur
+`${entry.id} ${entry.name}` (L558). Ce n'est pas une catégorie déclarée par le registre, c'est une
+heuristique de nommage.
+
+Le champ `selectedBeat` (L93) ne sert qu'à souligner le bloc qui a le focus (L774) ; aucune action
+ne s'applique « au bloc sélectionné », toutes prennent leur indice `i` directement.
+
+---
+
+## 3. L'état React
+
+Trente-deux `useState` sont déclarés entre L76 et L111. Voici ceux qui portent la matière.
+
+Le document vit dans `projects` (L76) et `currentId` (L77), et le projet courant se dérive L117.
+Un projet contient `brief`, `notes`, `cut`, `seed`, et un dictionnaire `compositions` indexé par
+identifiant de thème. La persistance est locale, immédiate à chaque écriture, par `saveProjects`
+dans `patchProject` (L135). Le document Create associé tient dans `docPath` et `docSha` (L104,
+L105), ce dernier étant l'empreinte GitHub qui permet au serveur de refuser une écriture
+concurrente, comme l'explique le commentaire L102 à L103.
+
+Le Cut se lit L179 depuis le projet ; il n'a pas d'état propre. La composition se dérive L180 à
+L183 par `normalizeComposition(project.compositions?.[themeId], themeId)`, et s'écrit L184 à L191
+par `patchComposition`. Le point important est que la composition est INDEXÉE PAR THÈME : changer
+de thème change de composition, et le contrat `normalizeComposition` renvoie une composition vide
+si le `themeId` ne correspond pas.
+
+La sélection tient dans deux variables sans rapport l'une avec l'autre : `selectedComponent`
+(L99), un identifiant d'instance Lego, remis à zéro à chaque changement de thème (L160) ; et
+`selectedBeat` (L93), un indice de bloc. Il n'existe aucune notion unifiée de « chose
+sélectionnée ».
+
+Le thème tient dans `themeId` (L78), le thème chargé dans `theme` (L81), chargé de façon
+asynchrone L151 à L158 avec annulation propre, et son erreur dans `themeError` (L82). Les
+composants du thème arrivent séparément dans `componentBundle` (L95), chargés L162 à L169.
+
+Le format tient dans `formatId` (L79) et se résout L118 par `getFormat`. Deux échelles distinctes
+cohabitent, et le commentaire L107 à L111 prévient explicitement de ne pas les confondre :
+`contentScale` (L111) est l'échelle du CONTENU imposée par la mesure, qui part dans le fichier
+exporté ; `fitScale`, retourné par `useFitScale` (L270), est le zoom d'AFFICHAGE de l'aperçu, purement
+cosmétique. `contentScale` est remis à `null` dès que l'entrée change (L223), sans quoi un texte
+raccourci resterait rétréci pour toujours.
+
+Le reste est de l'interface : `deckTab`, `libraryTab`, `libraryQuery`, `openFamilies`,
+`openComponentGroups`, `paletteOpen`, `query`, `paletteIndex`, `toast`, `busy`, `showSafe`,
+`renderDark`, `dropTarget`, `browser`, `published`, `log`, `actionCount`, `imageIndexReady`,
+`renderedIssues`.
+
+---
+
+## 4. L'acquis à préserver, « éditer un composant à gauche, à droite, en bas, en haut »
+
+Ce que Matthieu décrit est produit par un mécanisme précis, et il tient en trois pièces qui
+travaillent ensemble.
+
+La première est `placementAt`, L594 à L601. Elle transforme la position du curseur à l'intérieur
+de la cible en l'une de quatre valeurs, `above`, `below`, `left`, `right`, en découpant la boîte
+en quart haut, quart bas, et moitiés gauche et droite du bandeau central. Elle est appelée à la
+fois au survol (`onStructureDragOver` L603 à L608) et au dépôt (`onStructureDrop` L610 à L625),
+donc ce que l'on voit annoncé est exactement ce qui sera fait.
+
+La deuxième est le retour visuel, dans `media.css` L218 à L227. L'attribut `data-drop` porté par
+l'élément survolé (posé L721) déclenche un pseudo-élément `::before` qui dessine une barre bleue
+de 2 px, horizontale au-dessus ou au-dessous, verticale à gauche ou à droite, avec un halo
+`box-shadow`. C'est ce trait qui rend le geste lisible avant le lâcher.
+
+La troisième est le modèle : `addComponent`, `addImage` et `moveItem` de `composition.js`
+acceptent tous trois un `targetId` et un `placement`, et `PLACEMENTS` y est déclaré comme une
+constante exportée valant exactement `['above', 'below', 'left', 'right']` (`composition.js` L9).
+Le modèle est donc plat à deux niveaux, des lignes qui empilent verticalement et des éléments qui
+partagent l'espace horizontal, comme l'annonce l'en-tête du fichier ; `above` et `below` créent
+une ligne, `left` et `right` insèrent dans la ligne existante. Le repli automatique est assuré par
+la grille `repeat(auto-fit, minmax(min(100%, 112px), 1fr))` de `media.css` L197.
+
+Ces trois pièces sont le seul endroit du code qui produit la sensation décrite. Un point de
+fragilité mérite d'être noté : le même geste n'existe QUE dans le panneau de structure. Il ne
+fonctionne pas dans l'aperçu, et la bibliothèque ne sait faire que « déposer sur une cible de la
+structure ». Si une refonte déplaçait la manipulation vers l'aperçu sans porter `placementAt` et
+ses quatre placements avec elle, l'acquis serait perdu.
+
+---
+
+## 5. Les manques, par gravité
+
+**Grave, parce qu'ils empêchent un travail d'éditeur.**
+
+Un composant posé deux fois affiche deux fois le même texte, et rien ne permet de leur en donner
+deux différents. La cause est unique et se lit à `compile.js` L221 : `renderTemplate(part.body,
+data)` avec un `data` global. Côté interface, aucun appel de `patchItem` n'écrit `props`, les
+seuls existants étant `MediaApp.jsx` L733 et L734. C'est la carte C1, déclarée bloquante par le
+KANBAN, et rien de ce qui suit n'a de sens sans elle.
+
+Il n'existe aucun panneau de détails. La sélection posée L722 n'alimente aucune surface d'édition.
+
+Rien ne s'annule. `patchComposition` (L184) et `patchProject` (L132) remplacent l'état sans en
+garder l'histoire, et aucun raccourci `⌘Z` n'est enregistré ; les deux seuls écouteurs clavier du
+fichier sont `⌘S` (L393) et `⌘K` (L469). Un glisser malheureux se répare à la main.
+
+L'aperçu ne se sélectionne pas, alors que l'identifiant nécessaire est déjà écrit dans le HTML
+(`compile.js` L214 et L227). C'est la carte C2.
+
+**Moyen, parce qu'ils font perdre du temps sans bloquer.**
+
+La bibliothèque ne connaît pas la famille du thème. La distinction entre composants et icônes
+repose sur une expression régulière de nommage (L558) et non sur une donnée déclarée, ce qui
+recoupe la carte C4.
+
+Le sélecteur de thème est une liste plate groupée par famille, sur deux niveaux seulement
+(L970 à L990), sans aperçu visuel ni filtre par format servi. Le texte affiché L966 annonce
+lui-même la cible de 1024 ; la carte C5 dit qu'une liste plate devient inutilisable vers quarante
+entrées.
+
+Les zones de sécurité existent et s'affichent (L865 à L872), mais l'inspection du fichier montre
+que le bouton n'apparaît que si `format.safe` est défini (L841). Le KANBAN présente C6 comme non
+faite ; ce que je lis dans `MediaApp.jsx` ressemble à une implémentation existante. Je n'ai pas lu
+`formats.js`, donc je ne peux pas dire si les sept formats déclarent tous leur `safe`, et la
+contradiction reste à trancher, hypothèse la plus probable étant que la carte C6 est plus avancée
+que le tableau ne l'indique.
+
+Le verrouillage d'un élément n'empêche que le glisser (L718). Ses quatre boutons d'action restent
+cliquables, dont Retirer (L736). Un élément verrouillé se supprime donc en un clic, ce qui vide le
+verrou d'une bonne part de son sens.
+
+Le compteur d'actions (L1151) n'exerce aucune contrainte, alors que l'en-tête du fichier L8 à L9
+dit qu'il est là « pour empêcher la dérive, pas pour décorer ».
+
+**Léger, mais à noter.**
+
+Trois couleurs sont écrites en dur dans `MediaApp.jsx` L941, `#30d158` et `#ff453a`, et `media.css`
+en contient davantage, notamment le bleu `#0a84ff` répété une quinzaine de fois (par exemple L97,
+L114, L157, L173, L204, L219). Or `src/config/colors.js` pose en toutes lettres, dans son en-tête,
+qu'aucune couleur d'interface ne s'écrit ailleurs que là et qu'une couleur en dur hors de ce
+fichier est un bug à corriger. Aucun fichier de `src/zenraymedia/` n'importe `colors.js` d'après la
+recherche que j'ai lancée sur les `.jsx` du dossier. Les tokens `--g9-*` employés par `media.css`
+sont, eux, définis ailleurs dans le projet, `src/fonts.css` figurant parmi les fichiers qui les
+mentionnent ; je n'ai pas ouvert ce fichier pour vérifier lequel les DÉFINIT plutôt que les
+consomme, donc ce point reste à confirmer.
+
+Le fichier fait 1158 lignes pour une seule fonction de composant. Les onglets du Deck, la
+bibliothèque et le panneau de structure sont trois surfaces indépendantes qui pourraient vivre
+séparément ; leur cohabitation dans une même fonction fait que toute frappe dans le brief
+réévalue l'ensemble, ce que les nombreux `useMemo` du fichier cherchent d'ailleurs à contenir,
+avec un commentaire explicite L120 à L121 sur le coût du regroupement à 1024 thèmes.
+
+Enfin, la mise en page ne descend pas bien en dessous de 1100 px : la règle `media.css` L322 à
+L325 replie tout en une seule colonne et abandonne la hauteur fixe. Ce n'est pas un défaut en soi
+pour un outil de poste fixe, c'est un choix, mais il vaut d'être su.

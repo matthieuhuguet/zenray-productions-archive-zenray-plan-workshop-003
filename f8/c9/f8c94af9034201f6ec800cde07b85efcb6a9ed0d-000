@@ -1,0 +1,53 @@
+{
+  "name": "zenray-progress",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ZenRayProgress — LifeOS de Matthieu Huguet : tableau de bord d'objectifs + agenda hebdomadaire, persistant.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:music": "vitest run src/audio src/create --passWithNoTests",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.2.0",
+    "@blocknote/core": "^0.51.3",
+    "@blocknote/mantine": "^0.51.3",
+    "@blocknote/react": "^0.51.3",
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
+    "@jsquash/jpeg": "^1.6.0",
+    "@jsquash/webp": "^1.5.0",
+    "@upstash/redis": "^1.34.3",
+    "@vercel/analytics": "^1.3.1",
+    "dashjs": "^4.7.4",
+    "epubjs": "^0.3.93",
+    "fflate": "^0.8.3",
+    "heic2any": "^0.0.4",
+    "hls.js": "^1.6.16",
+    "jassub": "^1.8.8",
+    "mammoth": "^1.12.0",
+    "marked": "^14.1.3",
+    "masonic": "^4.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.185.0",
+    "tldraw": "^5.0.1",
+    "utif": "^3.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^24.1.3",
+    "vite": "^5.4.11",
+    "vitest": "^3.2.6"
+  }
+}

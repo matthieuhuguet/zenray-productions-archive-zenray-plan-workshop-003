@@ -1,0 +1,174 @@
+# ZenRayRef — tout ce que la fonctionnalité sait faire
+
+Écrit le 2026-08-30, parce qu'aucun document ne le disait et que déboguer un produit dont on ne
+connaît pas le périmètre revient à tâtonner. **Ce fichier fait foi sur le PÉRIMÈTRE** : ce qui n'y
+figure pas n'existe pas, ce qui y figure ne se réinvente pas.
+
+Soixante-deux fonctionnalités, treize fichiers, 1 613 lignes. Dix d'entre elles portent la trace
+d'un bug réel déjà payé, et ces dix-là sont les plus précieuses : chacune décrit un piège qui a
+coûté une session et que le code évite désormais. Les supprimer en croyant simplifier reviendrait à
+racheter la même leçon.
+
+---
+
+## Le principe qui tient tout
+
+**Un board ne contient JAMAIS un octet de média.** Il ne contient que des RÉFÉRENCES vers des nœuds
+Create (`.img.json`, `.media.json`, `.embed.json`, pages), plus de la mise en page et des
+annotations. Les images vivent dans les shards, comme partout ailleurs dans ZenRayProgress.
+
+C'est ce principe qui rend un board de mille images possible : le JSON reste petit, la copie reste
+rapide, et une image déjà présente sur le drive s'ajoute sans un octet de transfert.
+
+---
+
+## A. Le modèle de données
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| A1 | Nœud board `.ref.json` (nouveau nom) ou `.canvas.json` (rétrocompatible), schéma `zenray.ref.canvas.v1` | `schema.js` |
+| A2 | Zéro binaire, zéro data URL, zéro base64 dans le board. Que des références. | `schema.js` |
+| A3 | `items` est un OBJET indexé par id, jamais un tableau : la fusion multi-onglets devient triviale | `schema.js` |
+| A4 | Douze types d'items : `image-ref`, `media-ref`, `audio-ref`, `embed-ref`, `page-ref`, `text`, `sticky`, `shape`, `arrow`, `frame`, `group`, `comment-pin` | `schema.js` |
+| A5 | `normalizeCanvas` répare un board ancien ou partiel plutôt que de le rejeter, et ne lève jamais | `schema.js` |
+| A6 | Chaque item porte `x y w h rotation z locked hidden opacity fit crop style meta updatedAt` | `schema.js` |
+| A7 | Réglages par défaut : fond `#FDFDFC` (jamais de blanc pur), grille, aimantation 8 px | `schema.js` |
+| A8 | Lecture et écriture par `/api/page` vers `zenray-data`, avec `sha` optimiste | `content.js` |
+| A9 | Fusion item par item au `updatedAt` le plus récent ; un item présent d'un seul côté survit | `mergeCanvas.js` |
+| A10 | Pierres tombales `deleted` : distingue « jamais vu » de « supprimé ». À égalité de date, le local gagne. | `mergeCanvas.js` |
+| A11 | `listChildren` liste un dossier sans récursion (passe à l'échelle) | `content.js` |
+
+## B. La sauvegarde
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| B1 | Sauvegarde automatique débouncée à **1 200 ms** : une rafale de glissements coûte UNE écriture | `useRefAutosave.js` |
+| B2 | Conflit 409 : relire, fusionner, réécrire, deux passes. Aucune perte. | `useRefAutosave.js` |
+| B3 | `BroadcastChannel` par board : les autres onglets savent qu'une version fraîche existe | `useRefAutosave.js` |
+| B4 | Écriture forcée au démontage et au relâchement du pointeur | `useRefAutosave.js`, `RefBoard.jsx` |
+| B5 | Six états lisibles : `idle saving saved conflict offline error`, affichés en pastille | `CanvasNodeViewer.jsx` |
+| B6 | **Bug payé le 2026-07-22.** Une modification arrivée PENDANT une écriture était avalée deux fois. Le code mémorise la version envoyée et relance un cycle si autre chose est arrivé. | `useRefAutosave.js` |
+
+## C. Le canevas
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| C1 | tldraw fournit : navigation, zoom, sélection, rectangle de sélection, déplacement, redimensionnement, rotation, groupage, alignement, ordre de plan, annulation, raccourcis, aimantation | tldraw |
+| C2 | **Culling** : les formes hors écran ne se dessinent pas. C'est ce qui rend mille images tenables. | tldraw |
+| C3 | **LOD** : la vignette webp 1080 sert par défaut, le plein format n'arrive qu'au zoom fort ou à l'export | `RefBoard.jsx` |
+| C4 | Déchiffrement AES-GCM des images de shard à CHAQUE rendu, jamais figé dans le JSON | `RefBoard.jsx`, `resolveRef.js` |
+| C5 | Les polices du board sont celles de ZenRay : les fichiers de tldraw sont remplacés par les nôtres | `RefBoard.jsx` |
+| C6 | **Images provisoires** : une image lâchée apparaît AU LÂCHER depuis le cache du navigateur, manipulable pendant que l'octet monte, puis remplacée par la version du drive | `RefBoard.jsx` |
+| C7 | Quitter la page avant la fin de l'envoi ne laisse pas d'image fantôme (la table provisoire est en mémoire, volontairement) | `RefBoard.jsx` |
+| C8 | Le mode de couleur suit le thème de l'app, au montage et à chaque bascule | `RefBoard.jsx` |
+| C9 | **Bug payé le 2026-07-19.** `props.src` d'un asset tldraw refuse le protocole `blob:`. On y met la référence stable, et le déchiffrement se fait au rendu. | `RefBoard.jsx` |
+| C10 | **Bug payé le 2026-07-19.** `upload()` ne lève JAMAIS : un rejet non rattrapé par tldraw donnait un écran blanc. Échec doux plus notification. | `RefBoard.jsx` |
+| C11 | **Bug payé le 2026-07-22.** Ne jamais mémoriser un `objectURL` produit par un cache qu'on ne contrôle pas : le LRU le révoque et l'image meurt. Le cache ne garde que le stable. | `resolveRef.js` |
+| C12 | **Bug payé le 2026-08-30.** `inferDarkMode` n'existe plus dans tldraw 5 : la prop était ignorée en silence, la barre d'outils blanche devenait invisible sur canevas blanc. | `RefBoard.jsx` |
+
+## D. La barre d'outils
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| D1 | Huit outils visibles : sélection, main, texte, post-it, formes, flèche, ligne, dessin | `RefToolbar.jsx` |
+| D2 | Trois de plus sous les points de suspension : gomme, cadre, pointeur laser | `RefToolbar.jsx` |
+| D3 | Bascule du sélecteur d'images du drive | `RefToolbar.jsx` |
+| D4 | Annuler et rétablir, désactivés quand il n'y a rien à faire | `RefToolbar.jsx` |
+| D5 | Verticale à gauche, en verre, remplace la barre native de tldraw | `ref.css` |
+
+## E. Le panneau de texte
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| E1 | Remplace le panneau de styles de tldraw, jamais ne s'y ajoute (pas de seconde source de vérité) | `RefTextPanel.jsx` |
+| E2 | **Trois polices, jamais quatre** : Sans, Serif, Mono. La contrainte se tient dans le sélecteur. | `RefTextPanel.jsx` |
+| E3 | Quatre tailles nommées en clair plutôt qu'en lettres | `RefTextPanel.jsx` |
+| E4 | La graisse s'applique en parcourant `richText` (TipTap), donc SANS entrer en édition | `RefTextPanel.jsx` |
+| E5 | Ne s'affiche que pour les formes qui portent du texte | `RefTextPanel.jsx` |
+
+## F. Le sélecteur d'images du drive
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| F1 | Toutes les images déjà sur le drive (`.img.json` de l'index de recherche) | `RefImagePicker.jsx` |
+| F2 | Section « images du projet » par défaut, recherche sur tout le drive à partir de deux lettres | `RefImagePicker.jsx` |
+| F3 | Un clic insère au centre de la vue | `RefImagePicker.jsx` |
+| F4 | Un glisser dépose au point exact du pointeur (MIME `application/zenray-ref-image`) | `RefImagePicker.jsx` |
+| F5 | Insertion par RÉFÉRENCE : zéro re-envoi, zéro octet transféré | `RefImagePicker.jsx` |
+| F6 | Pagination par 60 | `RefImagePicker.jsx` |
+
+## G. L'import
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| G1 | Glisser depuis le sélecteur d'images vers le board | `RefBoardHost.jsx` |
+| G2 | Glisser depuis Create ou Gallery (`application/zenray-page`) : référence pure, zéro re-envoi | `RefBoardHost.jsx` |
+| G3 | Glisser depuis le Finder : pipeline `captureFiles`, envoi vers un shard, puis référence | `RefBoardHost.jsx` |
+| G4 | **Plusieurs fichiers à la fois** : UN SEUL appel `captureFiles` pour tout le lot | `RefBoardHost.jsx` |
+| G5 | Décalage en cascade de 26 px : plusieurs fichiers lâchés ensemble ne s'empilent pas | `RefBoardHost.jsx` |
+| G6 | Liste des envois en bas à droite, une entrée par lot, avec sa barre | `RefBoardHost.jsx` |
+| G7 | Coller une URL YouTube crée un `.embed.json` | `RefBoardHost.jsx` |
+| G8 | Voile bleu en pointillés pendant le survol d'un glisser | `RefBoardHost.jsx` |
+| G9 | **Bug payé le 2026-08-30.** `captureFiles` appelé une fois PAR fichier neutralisait son pool de quatre, commitait l'index N fois, et rerendait tout le canevas à chaque progression. D'où « impossible d'uploader » et « l'UI stutter ». | `RefBoardHost.jsx` |
+| G10 | **Bug payé le 2026-07-19.** Ce wrapper n'était monté que par l'ancien écran RefApp : tout le glisser-déposer était mort pour le flux principal. `UnifiedViewer` l'importe désormais. | `RefBoardHost.jsx` |
+
+## H. Les vidéos intégrées
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| H1 | Reconnaît `youtu.be`, `/watch`, `/embed/`, `/shorts/` | `embed.js` |
+| H2 | Lit l'instant de départ (`t=90`, `t=1m30s`) | `embed.js` |
+| H3 | Liste blanche stricte de fournisseurs : rien d'autre ne passe | `embed.js` |
+| H4 | Jamais de HTML brut stocké : seulement fournisseur, identifiant, URL canonique | `embed.js` |
+| H5 | URL canonique `youtube-nocookie.com`, bac à sable, chargement paresseux | `embed.js` |
+| H6 | Le nœud atterrit dans `<projet>/Embeds/<fournisseur>-<id>.embed.json` | `embed.js` |
+
+## I. La résolution des références
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| I1 | `image-ref` : manifeste `.img.json`, vignette et plein format servis par `/api/shard` | `resolveRef.js` |
+| I2 | `media-ref` et `audio-ref` : distingue l'audio du reste par le type MIME du manifeste | `resolveRef.js` |
+| I3 | `embed-ref` : fournisseur, identifiant, URL canonique, instant de départ | `resolveRef.js` |
+| I4 | `page-ref` : titre lisible d'une page Create | `resolveRef.js` |
+| I5 | Cache de MÉTADONNÉES seulement, jamais d'URL d'objet | `resolveRef.js` |
+| I6 | Le plein format ne se déchiffre qu'à la demande, jamais en boucle sur une grille | `resolveRef.js` |
+
+## J. Les projets et les boards
+
+| № | Ce que ça fait | Où |
+|---|---|---|
+| J1 | Un projet est un sous-dossier de `pages/Ref/`, avec sa page `.md` : recherchable et publiable | `RefApp.jsx` |
+| J2 | Les boards vivent dans `<projet>/Boards/` | `RefApp.jsx` |
+| J3 | Créer un projet écrit la page, ses propriétés et un premier board | `RefApp.jsx` |
+| J4 | Le dernier board ouvert est mémorisé | `RefApp.jsx` |
+| J5 | Un board s'ouvre DANS la zone de contenu : la barre latérale reste accessible | `RefApp.jsx`, `App.jsx` |
+| J6 | Double-cliquer un `.ref.json` depuis Create ouvre le board (routage par `UnifiedViewer`) | `UnifiedViewer.jsx` |
+| J7 | Vue bibliothèque dans la barre latérale, comme Plan et Skills | `App.jsx` |
+
+---
+
+## Ce qui n'existe PAS, et qu'il ne faut pas croire présent
+
+Cette liste vaut autant que la précédente : c'est elle qui empêche de chercher un bug dans une
+fonctionnalité qui n'a jamais été écrite.
+
+- Pas de dossier de fichiers PureRef importable (`.pur`).
+- Pas de mode présentation ni de diaporama.
+- Pas d'épingles de commentaire actives, malgré le type `comment-pin` réservé dans le schéma.
+- Pas de recadrage d'image sur le board, malgré le champ `crop` réservé.
+- Pas de fournisseur d'embed autre que YouTube.
+- Pas de collage d'image depuis le presse-papier DIRECTEMENT sur le board (le collage vise l'URL vidéo ; les images du presse-papier passent par Create).
+- Pas d'export du board en image ou en PDF.
+- Pas de palette de couleurs propre : celle de tldraw sert.
+- Pas de verrouillage ni de masquage exposés dans l'interface, malgré `locked` et `hidden` dans le schéma.
+
+---
+
+## Le coût de chargement, mesuré
+
+Le morceau `RefBoardHost` pèse **1 415 Ko** : c'est tldraw en entier, et c'est lui qui fait attendre
+deux secondes à la première ouverture. Ce n'est pas un défaut de code, c'est le prix de la
+bibliothèque. Les deux seules parades sont de **précharger** le morceau pendant que l'utilisateur
+regarde autre chose, et de **montrer quelque chose** pendant l'attente plutôt qu'un rectangle gris
+muet.

@@ -1,0 +1,151 @@
+# Backlog priorisé vers la vision
+
+## Principe d'ordre
+
+La priorité suit la distance au premier livrable social fiable, non la ressemblance avec les six
+logiciels. Une fonction qui enrichit l'éditeur mais ne raccourcit ni ne sécurise cette distance
+attend.
+
+Les tailles suivantes donnent un ordre de grandeur pour un développeur qui connaît déjà le dépôt :
+**S** moins d'une journée, **M** un à trois jours, **L** quatre à huit jours, **XL** plus de huit
+jours ou périmètre encore trop incertain. Elles ne constituent pas une promesse de calendrier.
+
+## P0 : rendre l'état vrai
+
+| ID | Travail futur | Taille | Dépend de | Porte vérifiable |
+|---|---|---:|---|---|
+| T0 | Créer la matrice vivante des capacités | M | rien | chaque carte expose C/T/I/V/R, test, commit et dernière validation |
+| T1 | Fixer le vocabulaire Enregistrer, Produire, Publier | S | rien | aucun bouton ne porte une promesse différente de son effet |
+| T2 | Écrire les contrats Document V3, Theme Package, Artifact et Publication | M | audit | revue approuvée ; chaque champ possède identité, version et propriétaire |
+| T3 | Ajouter la suite Playwright ZenRayMedia minimale | M | fixtures stables | création, sélection iframe, glisser, annuler, page et sauvegarde passent sous Chrome et WebKit |
+| T4 | Prouver le pont d'iframe et choisir son isolation | M | T3 | clic de sous-nœud fonctionnel ; contenu de thème incapable d'exécuter une action parent non autorisée |
+| T5 | Corriger la dérive documentaire automatique | S | T0 | métriques, thèmes, formats et tests sont générés ; aucune valeur recopiée à la main |
+| T6 | Lier contexte, chemin, SHA et publication au bon projet | M | T3 | passer de A à B restaure thème, format et sélection valides ; `⌘S` ne modifie jamais A et le reçu affiché appartient à B |
+| T7 | Rendre le navigateur Create et les attentes honnêtes | M | T3, T6 | Annuler ferme, props et mode réinitialisent la surface, erreur et dossier vide diffèrent, tout indicateur occupé se libère après rejet |
+| T8 | Fermer la frontière de confiance des thèmes | M | T2, T4 | un thème incomplet, scripté ou dépendant d'une ressource non déclarée est refusé avant indexation ; les styles libres ne peuvent pas injecter une déclaration |
+| T9 | Rendre le chargement de thème atomique | S | T3 | lors d'une transition lente de A vers B, Cut, composants, aperçu et commandes n'emploient jamais A sous l'identité B ; l'échec reste visible |
+
+Pourquoi P0 commence par des preuves : le moteur évolue pendant l'audit. Sans statut précis et test
+navigateur, une carte peut passer de « code présent » à « prêt » sans jamais traverser le parcours
+réel.
+
+## P1 : fiabiliser le travail éditable
+
+| ID | Travail futur | Taille | Dépend de | Porte vérifiable |
+|---|---|---:|---|---|
+| R1 | Transactions de geste | M | T3 | un glisser de cinq secondes produit une seule entrée ; Échap annule ; Annuler restaure l'avant |
+| R2 | État sale, autosave et récupération | M | T2 | après fermeture forcée, le brouillon le plus récent est proposé sans écraser Create |
+| R3 | Migrations de document | L | T2 | fixtures V1/V2 deviennent V3 sans perte ; version future reste en lecture protégée |
+| R4 | Visibilité et verrou effectifs uniques | M | T3 | rendu, boîte, marquee, snapping, compteur et clavier voient le même ensemble |
+| R5 | Presse-papiers versionné et conscient de la page | M | T2, R9 | la copie est indépendante, le collage rejoint la page active ou le masque choisi et toutes les références internes sont remappées |
+| R6 | Statut de conflit et révision | M | R2, R3 | deux onglets produisent un conflit lisible et aucune sauvegarde silencieuse |
+| R7 | Budgets de performance des gestes | M | R1 | 200 nœuds restent fluides, aucune sérialisation du store pendant le mouvement |
+| R8 | Identités locales uniques et sélection bornée au projet | S | T3 | suppression puis création ne produit aucun doublon ; tout changement de projet nettoie ou restaure sa sélection valide |
+| R9 | Séparer Page, groupe et masque | L | T2, T3 | grouper, dissoudre, copier et supprimer ne fait jamais sortir silencieusement un objet de sa page ; aucun groupe système n'est manipulable comme dossier ordinaire |
+| R10 | Rendre le connecteur cohérent avec la scène | M | R4, R9 | relation limitée à une page, sans fond, hit-test sur le trait, références remappées à la copie et état cassé explicite |
+| R11 | Rendre les mutations du Cut sans perte | S | T3 | Verrouillé bloque le contrat choisi ; une fusion conserve ou fait choisir tous les slots ; les IDs restent uniques |
+| R12 | Fermer le contrat du tracé Plume | M | T3, R1, R4, R9 | tracé rattaché à la page active ; un glisser égale une commande ; rotation, retournement, groupe verrouillé et insertion courbe passent ; SVG ou PNG rouvert conserve la forme |
+| R13 | Rendre les actifs liés ou incorporés explicites | L | T2, T8 | chaque image possède origine, droits, version, poids et état ; un export autonome échoue clairement si une ressource ne peut être incorporée, puis réussit hors ligne après reprise |
+
+Cette phase ne change pas encore l'apparence générale. Elle transforme le canevas en lieu où dix
+minutes de travail restent récupérables et où l'historique correspond aux gestes humains.
+
+## P2 : fermer la tranche Instagram et LinkedIn
+
+| ID | Travail futur | Taille | Dépend de | Porte vérifiable |
+|---|---|---:|---|---|
+| V1 | Modèle Page canonique | L | T2, R3, R9 | tous les nœuds appartiennent à une page ou un masque ; ancienne slide migre ; vignette réelle |
+| V2 | Variantes non destructives | L | V1 | source A, variante B, retour A identique ; overrides et conflits visibles |
+| V3 | Profils Instagram et LinkedIn | M | T2, V2 | formats, zones, poids, texte et nombre de pages portent une source datée |
+| V4 | Export PNG contrôlé | L | T3, V1 | toutes les pages sortent sous Chrome et WebKit ; dimensions, alpha, polices et poids mesurés |
+| V5 | Paquet carrousel | M | V4 | ZIP contient images ordonnées, légende, alt, contact sheet, manifeste, hashes et rapport QA |
+| V6 | Objet Publication et états | M | T2, V5 | brouillon, prêt, exporté, remis, publié et échoué survivent au redémarrage |
+| V7 | Galerie de publications | L | V6 | recherche et filtres retrouvent publication, variante, miniature, statut et dernière version |
+| V8 | Parcours Livraison | M | V3, V5, V6 | un brouillon prêt produit son paquet en trois actions au plus |
+| V9 | Adaptateur manuel de remise | S | V8 | destination ouverte, fichiers accessibles, confirmation et reçu conservés |
+| V10 | Adaptateurs API éventuels | XL | V6, V8, besoin confirmé | OAuth chiffré, retry idempotent, limites, webhooks et reçu distant testés |
+
+La porte de P2 est concrète : un carrousel de dix pages, mêlant texte français et japonais, images
+et composants, produit dix PNG conformes, un paquet et un reçu ; après redémarrage, la galerie le
+retrouve et permet de le dupliquer.
+
+## P3 : simplifier l'éditeur
+
+| ID | Travail futur | Taille | Dépend de | Porte vérifiable |
+|---|---|---:|---|---|
+| E1 | Scène unifiée Node | XL | R3, V1 | ajout, sélection, page, compteur et export ne distinguent plus Lego et Layer |
+| E2 | Identifiants sémantiques de sous-composant | L | T2 | réordonner le DOM d'une part conserve les overrides ; orphelins signalés |
+| E3 | Registre de commandes | M | R1 | menu, clavier et palette invoquent la même commande et le même état de disponibilité |
+| E4 | Décomposer `MediaApp.jsx` | L | E1, E3 | workspaces et panneaux séparés sans changement visuel, couverture inchangée ou meilleure |
+| E5 | Inspecteur contextuel unifié | M | E1 | propriétés communes, mixtes et invalides se comportent pareil pour toute sélection |
+| E6 | Auto Layout géométrique | L | E1 | groupe avec boîte, padding, alignement, Hug/Fill/Fixed minimal et test de redimensionnement |
+| E7 | Critique de scène et d'artefact | L | V4, E1 | chaque règle annonce modèle, DOM ou fichier ; clic depuis un blocage ouvre l'objet fautif |
+| E8 | Accessibilité éditeur | L | E3, E4 | clavier complet, focus visible, arbre ARIA, contraste, zoom 200 %, WebKit et Chrome |
+| E9 | Mode mobile de revue et livraison | L | V7, V8 | galerie, texte, image, QA et livraison fonctionnent à 390 px sans faux éditeur compressé |
+| E10 | Schéma de propriétés réellement typé | M | E1, H1 | booléen, choix, nombre, couleur et défaut ont un contrôle unique ; une propriété invalide bloque le paquet |
+
+La décomposition de `MediaApp.jsx` vient après les contrats et la scène. La faire avant reviendrait
+à répartir les mêmes ambiguïtés dans davantage de fichiers.
+
+## P4 : rendre les thèmes industrialisables
+
+| ID | Travail futur | Taille | Dépend de | Porte vérifiable |
+|---|---|---:|---|---|
+| H1 | Migrer les sept paquets au manifeste unique | L | T2, E2 | registre, tokens, polices, props, nœuds et licence valident ensemble |
+| H2 | Générer l'index léger | M | H1 | nombre, formats, tokens et chemins correspondent aux fichiers ; chargement reste paresseux |
+| H3 | Vignettes et golden tests | L | H1, V4 | chaque composant possède preview et comparaison tolérancée |
+| H4 | Un thème par famille | XL | H1 à H3 | 16 thèmes chargent, s'éditent et exportent deux formats |
+| H5 | Un thème par sous-famille | XL | H4, preuve d'usage | 128 thèmes restent sous les budgets de build, recherche et QA |
+| H6 | Déployer les 1 024 variantes | XL | H5, besoin réel | coût de maintenance et usage justifient le volume |
+
+Le chiffre 1 024 reste une cible de catalogue. Il ne doit pas devenir une obligation de fichiers
+tant que les seize familles n'ont pas prouvé leur utilité et leur maintenance.
+
+## P5 : fonctions avancées conditionnelles
+
+| ID | Travail futur | Déclencheur obligatoire | Première preuve |
+|---|---|---|---|
+| A1 | Routage et zones Miro avancés | trois plans réels dépassent le connecteur droit et les pages finies | ports, flèches, routage orthogonal, frame exportable et 1 000 relations fluides |
+| A2 | Canevas infini | les plans dépassent réellement les pages finies | 1 000 objets à 60 fps, mini-carte et export de frame |
+| A3 | Étendre le moteur vectoriel au-delà de la Plume | trois médias validés exigent Crayon, Shape Builder ou Pathfinder après R12 | opération minimale demandée, avec fixtures SVG et conservation au réenregistrement |
+| A4 | Opérations booléennes | les chemins existent et un cas répété le demande | union, soustraction et intersection avec fixtures SVG |
+| A5 | Animation de page | les exports fixes sont fiables et une publication courte la demande | timeline minimale, rendu déterministe, MP4 vérifié |
+| A6 | Collaboration temps réel | plusieurs auteurs travaillent simultanément sur le même média | conflits, présence, permissions, historique et récupération éprouvés |
+| A7 | Génération de textures | trois mois de développement préalable sont accomplis et priorité confirmée | projet séparé ou plugin, sans contaminer le document 2D |
+
+## Ce qu'il faut arrêter d'ajouter pour l'instant
+
+- extension Miro au-delà de R10, ou Illustrator au-delà de la stabilisation R12 sans cas d'usage et fixture ;
+- nouveaux formats qui n'entrent ni dans un profil de destination ni dans l'arbre ;
+- nouveaux thèmes avant le manifeste, les vignettes et le contrôle d'artefact ;
+- nouvelles propriétés de calque avant les transactions et la visibilité effective ;
+- nouvelles sorties dont le fichier ne peut pas être rouvert et mesuré ;
+- nouveaux statuts « 8/8 » qui ne disent pas quel niveau de preuve est atteint ;
+- refonte esthétique générale avant que les parcours Galerie, Variantes et Livraison existent.
+
+## Ordre de génération conseillé
+
+Lorsqu'un futur cycle de code commence, il doit prendre une seule tranche à la fois :
+
+1. tests rouges qui matérialisent la porte ;
+2. contrat ou migration minimale ;
+3. implémentation la plus petite ;
+4. tests unitaires et navigateurs ;
+5. artefact réel s'il y en a un ;
+6. validation utilisateur consignée séparément ;
+7. mise à jour générée de la matrice.
+
+Les lots ne doivent jamais modifier simultanément le schéma, l'interface, le compilateur et
+l'export sans checkpoints. Chaque phase garde une fixture et un rendu de référence sur disque, de
+sorte qu'une régression se voie avant la carte suivante.
+
+## Condition d'arrêt de la première vision puissante
+
+La première étape s'arrête lorsque ce scénario passe sans intervention technique :
+
+> Ouvrir la galerie, dupliquer un modèle de carrousel, modifier trois pages, créer deux variantes,
+> résoudre les blocages signalés, produire le paquet Instagram, marquer la remise, fermer
+> l'application, puis retrouver la publication et ses fichiers intacts.
+
+À cet instant, ZenRayMedia n'imite pas encore toute la surface de six logiciels. Il possède mieux :
+une chaîne cohérente qui transforme leur 80/20 en résultat publié.

@@ -1,0 +1,481 @@
+# ZenRayMedia, conception du système d'animation
+
+Document de conception. Rien de ce qui suit n'est implémenté ; ce qui existe déjà est signalé avec
+son fichier et sa ligne, et ce que je n'ai pas mesuré est écrit comme une supposition.
+
+Fichiers lus pour ce travail : `src/zenraymedia/forge.js` (133 l., en entier), `formats.js` (105 l.,
+en entier), `composition.js` (156 l., en entier), `document.js` (148 l., en entier),
+`docs/zenraymedia/KANBAN.md` (111 l., en entier), et les passages utiles de `compile.js`,
+`contracts.js`, `exporters.js`, `cut.js`, `media.css`, `themes/registry.js`, `src/config/colors.js`.
+Le mockup de référence `docs/zenraymedia/_source-matthieu/zenraymediav1-editor.html` a été lu au
+grep sur ses classes de timeline. Je n'ai exécuté aucun test et n'ai ouvert aucun navigateur, donc
+aucun chiffre de performance n'est avancé.
+
+## 0. Vérification préalable, ce qui existe déjà
+
+La question n'était pas « faut-il inventer un système d'animation », mais « y en a-t-il un ». La
+réponse tient en trois constats mesurés.
+
+Il existe un **vocabulaire** de mouvement dans le contrat de thème : `contracts.js` L106 liste
+`motion` parmi les sept groupes de décisions, et le gabarit de thème HTML écrit
+`motion: { enabled: false, ease: 'cubic-bezier(.16,1,.3,1)', enter: 0, stagger: 0, cut: 'none' }`
+(`themes/registry.js` L133). La clé `ease` est effectivement consommée, `compile.js` L117 la publie
+en variable `--zrm-ease`.
+
+Il existe deux **fondus d'entrée** codés en dur. Le premier vit sous `theme.motion.enabled`
+(`compile.js` L164 à L169) : une animation `zrm-in` de `theme.motion.enter` millisecondes, avec un
+décalage de `stagger` par bloc, sur vingt-quatre blocs au plus. Le second est dans la voie Lego
+(`compile.js` L250 à L254) : `.zrm-lego-item{animation:zrm-lego-in .3s cubic-bezier(.2,.75,.2,1)
+both}`, avec deux retards en dur de 0,035 s et 0,07 s sur les deuxième et troisième enfants
+seulement. Aucun des deux n'est réglable depuis l'interface, et le premier ne se déclenche jamais
+puisque `enabled: true` ne se trouve nulle part dans `src/zenraymedia/`.
+
+Il existe enfin une **horloge de capture** complète et correcte, et c'est de loin l'acquis le plus
+précieux. Le script produit par la Forge met toutes les animations en pause (`forge.js` L82) puis
+positionne leur temps courant image par image (`forge.js` L86) avant chaque capture, si bien que le
+rendu ne dépend jamais de l'horloge réelle.
+
+Conclusion : la machine de lecture existe, la matière à lire n'existe pas. Il n'y a nulle part une
+piste, un keyframe, une durée éditable, une courbe choisie, ni le moindre champ sérialisé qui
+décrive un mouvement. Le système à concevoir est donc le **modèle** et son **éditeur**, posés sur un
+mécanisme de rendu déjà écrit et déjà éprouvé.
+
+---
+
+## 1. Le modèle
+
+### 1.1 Où l'animation vit
+
+Elle vit **dans la composition**, jamais dans le thème ni dans le brief. Trois raisons, toutes
+vérifiables dans le code lu.
+
+D'abord, la composition est déjà indexée par thème : `document.js` L57 sérialise
+`compositions: project.compositions`, un dictionnaire `{ [themeId]: composition }`. Une animation
+posée sur une mise en page de presse n'a aucun sens sur une mise en page de jeu, et ce découpage la
+met automatiquement au bon endroit.
+
+Ensuite, une animation porte sur une **instance** posée, pas sur un composant du catalogue. Deux
+cartes issues du même `componentId` doivent pouvoir entrer à deux instants différents, exactement
+comme C1 exige qu'elles portent deux textes différents. L'identifiant d'instance existe déjà
+(`item.id`, alloué par `allocate()` dans `composition.js` L34) et il est déjà écrit dans le HTML
+compilé sous `data-zrm-instance` (`compile.js` L214 et L227).
+
+Enfin, le thème garde son rôle : il décide d'une **intention** de mouvement, pas d'une chorégraphie.
+`theme.motion.ease` reste la courbe par défaut du thème, `theme.motion.enter` sa durée d'entrée par
+défaut, et le document les surcharge pièce par pièce.
+
+### 1.2 La forme exacte
+
+Deux ajouts, et pas un de plus.
+
+Sur un item, un champ facultatif `anim` qui décrit ce que cette pièce fait dans le temps :
+
+```json
+{
+  "id": "cmp-1a2b3c4",
+  "kind": "component",
+  "componentId": "12-titre-ecran",
+  "hidden": false,
+  "locked": false,
+  "props": { "title": "La source chaude" },
+  "anim": {
+    "clips": [
+      { "id": "clp-0f31d92", "t": 0.20, "dur": 0.25, "ease": "outQuart",
+        "from": { "opacity": 0, "y": 24 }, "to": { "opacity": 1, "y": 0 } }
+    ]
+  }
+}
+```
+
+Sur la composition, un champ facultatif `timeline` qui décrit le temps global :
+
+```json
+{ "v": 1, "themeId": "T-04-1-1", "serial": 12, "rows": [],
+  "timeline": { "v": 1, "duration": 3.0, "fps": 30, "loop": false, "poster": 1.0 } }
+```
+
+`duration` en secondes, `fps` recopié du format pour que la quantification soit lisible dans le
+fichier, `loop` pour la lecture dans l'éditeur, et `poster` qui désigne l'instant unique auquel une
+sortie fixe est capturée. Ce dernier champ est le pivot de toute la section 5.
+
+### 1.3 Le vocabulaire des propriétés animables, et pourquoi il est fermé
+
+Une animation ne peut porter que sur cette liste :
+
+| Clé | Propriété CSS produite | Unité | Défaut au repos |
+|---|---|---|---|
+| `opacity` | `opacity` | sans | 1 |
+| `x` | `translate3d(x,y,0)` | px | 0 |
+| `y` | `translate3d(x,y,0)` | px | 0 |
+| `scale` | `scale()` | facteur | 1 |
+| `rotate` | `rotate()` | degrés | 0 |
+| `blur` | `filter: blur()` | px | 0 |
+| `clip` | `clip-path: inset()` | pourcentage | 0 |
+
+La liste est fermée pour une raison de doctrine, pas de confort. Toute clé ajoutée devient une
+promesse à tenir dans le rendu fixe, dans le rendu vidéo, dans le Critique et dans l'export, et
+chacune de ces quatre voies peut la trahir différemment. Les sept ci-dessus partagent la propriété
+d'être calculables hors du flux de mise en page, donc de ne jamais déplacer une mesure du Critique,
+qui mesure des débordements et des contrastes sur le document au repos.
+
+Les valeurs `x`, `y`, `scale` et `rotate` se compilent dans **une seule** déclaration `transform`,
+dans un ordre imposé (translation, rotation, échelle), sans quoi deux clips qui touchent deux
+composantes différentes s'écraseraient l'un l'autre.
+
+### 1.4 Comment cela survit à l'enregistrement
+
+C'est le point où le code lu commande la conception, et où il faut être précis parce que les deux
+ajouts ne se comportent pas de la même façon.
+
+Le champ `anim` sur un item survit **sans toucher une ligne** de `document.js`. `toDocument()`
+recopie `compositions` en bloc (L57) et `normalizeComposition()` reconstruit chaque item par
+`{ hidden: false, locked: false, props: {}, ...item }` (`composition.js` L26 à L30), donc tout champ
+inconnu est conservé par l'étalement. Vérifiable en une ligne de test : normaliser une composition
+qui porte un `anim` et constater qu'il est encore là.
+
+Le champ `timeline` sur la composition, en revanche, **serait perdu**. `normalizeComposition()`
+retourne un objet littéral à quatre clés, `{ v, themeId, serial, rows }` (`composition.js` L23 à
+L31), et rien d'autre ne passe. Il faut donc ajouter explicitement `timeline` à ce littéral, avec sa
+valeur par défaut. C'est une modification de trois lignes, et elle est obligatoire ; l'oublier
+produirait le pire des symptômes, une timeline qui fonctionne tant qu'on ne recharge pas.
+
+Aucun autre fichier n'est concerné. `saveDocument()` ne valide que le brief (`document.js` L107), et
+`fromDocument()` recopie `compositions` tel quel (L79 à L81), donc la lecture tolérante existante
+suffit. Un document écrit avant l'animation se relit sans `anim` ni `timeline`, et le rendu retombe
+sur le comportement d'aujourd'hui.
+
+### 1.5 Déterminisme
+
+La règle d'or du projet est qu'à graine égale la compilation produit la même chaîne octet pour
+octet. L'animation ne l'entame pas, à trois conditions écrites dans le modèle lui-même.
+
+Les instants et les durées sont **quantifiés** au multiple de 0,05 s à l'écriture, jamais au rendu ;
+une valeur arrondie deux fois diverge. Les courbes sont désignées par leur **nom** dans le document
+et résolues en bezier ou en échantillons par une table constante, jamais recalculées. Enfin aucun
+tirage aléatoire n'entre dans la chaîne : `compile.js` L292 consomme déjà un générateur à graine
+plutôt que `Math.random`, et le décalage automatique d'une série de pièces doit suivre la même
+règle, un indice multiplié par un pas fixe.
+
+---
+
+## 2. La timeline, zone 7 de la référence
+
+### 2.1 Ce que la référence montre exactement
+
+Le mockup `zenraymediav1-editor.html` place la timeline en `grid-column:2; grid-row:2`, sous le
+canevas et à droite de l'arbre, sur une rangée de 190 px. Sa structure est une grille
+`grid-template-columns:90px minmax(600px,1fr)` : une colonne d'étiquettes et une colonne de pistes.
+Une règle temporelle de 18 px de haut la surmonte, dessinée par un dégradé répété tous les 48 px.
+Chaque piste fait 28 px, chaque clip 22 px, arrondi à 6 px, et trois couleurs distinguent trois
+natures de piste. La barre d'outils tient deux boutons, un zoom et une lecture. Les trois pistes de
+l'exemple sont nommées « Article blocks », « Motion UI » et « Sound brief ».
+
+### 2.2 Où elle se pose dans l'éditeur réel
+
+L'éditeur actuel ne suit pas cette grille. `media.css` L7 à L22 pose trois colonnes et trois
+rangées, la dernière valant `minmax(205px, 27vh)`, et la bibliothèque l'occupe déjà sur toute la
+largeur (`.zrm-library { grid-column:1 / -1 }`, `media.css` L258).
+
+La proposition la plus économe est donc de **ne pas toucher la grille** et d'ajouter un onglet à la
+barre de la bibliothèque, qui en porte déjà trois. Timeline et bibliothèque partagent la même
+rangée, jamais visibles ensemble. On y gagne qu'aucune des cinq zones existantes ne bouge, et on y
+perd de ne pas voir en même temps les pièces disponibles et la chronologie, ce qui est acceptable
+puisque poser une pièce et l'animer sont deux gestes séparés dans le temps.
+
+### 2.3 Pistes
+
+Une piste vaut **une instance posée**, dans l'ordre de la composition, lignes puis éléments. Cette
+correspondance de un pour un évite d'introduire un second arbre à tenir synchronisé, et elle rend la
+sélection commune aux deux panneaux : sélectionner dans la structure sélectionne dans la timeline,
+et réciproquement, ce qui est aussi ce que demande la carte C2 pour l'aperçu.
+
+Trois natures de piste, et donc trois couleurs, prises dans `src/config/colors.js` puisque le fichier
+pose en tête qu'une couleur en dur ailleurs est un bug : `UI.blue` (`#4295f7`) pour un composant,
+`UI.purple` (`#d06ef7`) pour une image, `UI.green` (`#70f165`) pour une piste de son quand elle
+existera. Ce choix corrige au passage un écart connu, `media.css` porte aujourd'hui `#0a84ff` en dur
+une quinzaine de fois.
+
+Une piste verrouillée (`item.locked`, déjà dans le modèle) refuse le déplacement de ses clips, et une
+piste masquée (`item.hidden`) les grise sans les supprimer.
+
+### 2.4 Keyframes et clips
+
+Le modèle expose un **clip**, pas un keyframe isolé, et c'est une décision qui mérite d'être
+défendue. Un keyframe nu oblige à en poser deux pour obtenir le moindre mouvement, à les
+sélectionner ensemble pour le décaler, et à gérer le cas dégénéré du keyframe unique. Un clip porte
+son début, sa durée, sa courbe, son état de départ et son état d'arrivée ; il se déplace d'un
+glisser, se redimensionne par ses deux poignées, se duplique d'un raccourci. C'est le modèle des
+outils de montage, et c'est celui que dessine la référence, dont les objets sont des rectangles
+nommés et non des losanges.
+
+Les keyframes restent accessibles à qui en veut : deux clips adjacents sur la même piste équivalent à
+trois keyframes, et le compilateur les traite comme tels puisqu'il produit de toute façon une règle
+`@keyframes` par piste. Rien n'est perdu, la manipulation courante est simplement plus rapide.
+
+Règle de recouvrement : deux clips d'une même piste ne peuvent pas se chevaucher s'ils touchent la
+même propriété. Le plus simple, et le seul comportement qui ne surprend jamais, est de refuser le
+dépôt et de faire glisser le clip contre son voisin.
+
+### 2.5 Durée, lecture, boucle
+
+La durée de la timeline se dérive par défaut, jamais ne s'invente. Sur un format temporel,
+`durationOf(cut, format)` (`formats.js` L94 à L99) donne déjà la durée du cut bornée par
+`format.time.min` et `format.time.max`, soit de 10 à 90 s en vidéo 16:9 et de 2 à 60 s en habillage
+alpha. Sur un format fixe, la durée par défaut vaut la fin du dernier clip, arrondie au dixième
+supérieur, et sert uniquement à l'aperçu.
+
+La lecture reprend **exactement** le mécanisme de la Forge, et c'est le point technique le plus
+important de tout ce document. On ne recompile pas l'iframe à chaque image, ce qui serait absurde
+alors que la compilation est déjà débattue à 220 ms. On prend `iframe.contentDocument.getAnimations()`,
+on met tout en pause une fois, puis une boucle `requestAnimationFrame` écrit `currentTime` sur chaque
+animation à partir de la position de la tête de lecture. Le déplacement manuel de la tête écrit la
+même valeur. La conséquence est celle qui compte : l'aperçu et le fichier rendu lisent la même
+horloge, avec le même code, donc ce qu'on voit est ce qui sort.
+
+La boucle est un réglage d'aperçu et **ne part pas** dans le fichier exporté. Une page HTML publiée
+qui rejoue son animation sans fin est une gêne, et un rendu vidéo qui boucle fausse la durée
+déclarée.
+
+Une précision arithmétique qui a des conséquences réelles. À 30 images par seconde, les durées
+impaires de la palette tombent entre deux images : 0,05 s vaut 1,5 image, 0,15 s vaut 4,5, 0,25 s
+vaut 7,5 et 0,35 s vaut 10,5. Les durées paires sont entières, 0,10 s valant 3 images, 0,20 s en
+valant 6 et 0,30 s en valant 9. À 60 images par seconde, les sept valeurs sont entières, de 3 à 21.
+Ce n'est pas un défaut du modèle, l'horloge virtuelle échantillonne proprement une valeur continue,
+mais une pièce dont l'entrée dure 0,05 s à 30 i/s n'existe que sur une image et demie, donc l'œil ne
+la verra pas. La timeline doit afficher cet avertissement plutôt que de le taire.
+
+---
+
+## 3. Les trente courbes
+
+Chacune est donnée avec sa forme exacte. Les vingt-quatre premières sont des Bézier cubiques et
+partent telles quelles dans le CSS ; les six dernières, Elastic et Bounce, ne sont pas représentables
+par une Bézier cubique et sont données par leur formule, avec en section 5 la manière de les
+compiler.
+
+Les valeurs de Bézier sont celles publiées par easings.net, référence donnée par Matthieu. Elles se
+vérifient en une commande : tracer `cubic-bezier(a,b,c,d)` et la formule côte à côte sur cent points
+et comparer, l'écart devant rester sous le millième.
+
+### 3.1 Les vingt-quatre courbes exprimables en `cubic-bezier`
+
+| Nom | `cubic-bezier` | Formule de référence |
+|---|---|---|
+| easeInSine | `cubic-bezier(0.12, 0, 0.39, 0)` | `1 - cos((x·π)/2)` |
+| easeOutSine | `cubic-bezier(0.61, 1, 0.88, 1)` | `sin((x·π)/2)` |
+| easeInOutSine | `cubic-bezier(0.37, 0, 0.63, 1)` | `-(cos(π·x) - 1)/2` |
+| easeInQuad | `cubic-bezier(0.11, 0, 0.5, 0)` | `x²` |
+| easeOutQuad | `cubic-bezier(0.5, 1, 0.89, 1)` | `1 - (1-x)²` |
+| easeInOutQuad | `cubic-bezier(0.45, 0, 0.55, 1)` | `x < 0.5 ? 2x² : 1 - (-2x+2)²/2` |
+| easeInCubic | `cubic-bezier(0.32, 0, 0.67, 0)` | `x³` |
+| easeOutCubic | `cubic-bezier(0.33, 1, 0.68, 1)` | `1 - (1-x)³` |
+| easeInOutCubic | `cubic-bezier(0.65, 0, 0.35, 1)` | `x < 0.5 ? 4x³ : 1 - (-2x+2)³/2` |
+| easeInQuart | `cubic-bezier(0.5, 0, 0.75, 0)` | `x⁴` |
+| easeOutQuart | `cubic-bezier(0.25, 1, 0.5, 1)` | `1 - (1-x)⁴` |
+| easeInOutQuart | `cubic-bezier(0.76, 0, 0.24, 1)` | `x < 0.5 ? 8x⁴ : 1 - (-2x+2)⁴/2` |
+| easeInQuint | `cubic-bezier(0.64, 0, 0.78, 0)` | `x⁵` |
+| easeOutQuint | `cubic-bezier(0.22, 1, 0.36, 1)` | `1 - (1-x)⁵` |
+| easeInOutQuint | `cubic-bezier(0.83, 0, 0.17, 1)` | `x < 0.5 ? 16x⁵ : 1 - (-2x+2)⁵/2` |
+| easeInExpo | `cubic-bezier(0.7, 0, 0.84, 0)` | `x = 0 ? 0 : 2^(10x-10)` |
+| easeOutExpo | `cubic-bezier(0.16, 1, 0.3, 1)` | `x = 1 ? 1 : 1 - 2^(-10x)` |
+| easeInOutExpo | `cubic-bezier(0.87, 0, 0.13, 1)` | `0/1 aux bornes, sinon x < 0.5 ? 2^(20x-10)/2 : (2 - 2^(-20x+10))/2` |
+| easeInCirc | `cubic-bezier(0.55, 0, 1, 0.45)` | `1 - √(1 - x²)` |
+| easeOutCirc | `cubic-bezier(0, 0.55, 0.45, 1)` | `√(1 - (x-1)²)` |
+| easeInOutCirc | `cubic-bezier(0.85, 0, 0.15, 1)` | `x < 0.5 ? (1 - √(1 - (2x)²))/2 : (√(1 - (-2x+2)²) + 1)/2` |
+| easeInBack | `cubic-bezier(0.36, 0, 0.66, -0.56)` | `c₃x³ - c₁x²` |
+| easeOutBack | `cubic-bezier(0.34, 1.56, 0.64, 1)` | `1 + c₃(x-1)³ + c₁(x-1)²` |
+| easeInOutBack | `cubic-bezier(0.68, -0.6, 0.32, 1.6)` | `x < 0.5 ? ((2x)²·((c₂+1)·2x - c₂))/2 : ((2x-2)²·((c₂+1)·(2x-2) + c₂) + 2)/2` |
+
+Constantes de la famille Back : `c₁ = 1.70158`, `c₂ = c₁ · 1.525 = 2.5949095`, `c₃ = c₁ + 1 = 2.70158`.
+
+Deux avertissements qui ne se voient qu'à l'usage. Les trois courbes Back sortent de l'intervalle
+[0,1], la première ordonnée d'`easeInBack` valant -0,56 et la seconde d'`easeOutBack` valant 1,56 :
+appliquées à une opacité, elles produisent des valeurs négatives ou supérieures à 1 que le navigateur
+écrête, ce qui donne un temps mort au lieu d'un rebond. Elles se réservent aux transformations. Par
+ailleurs les courbes Expo ont une pente si forte près de leur borne plate qu'en dessous de 0,15 s
+elles se lisent comme un saut, ce qui les rend inutiles sur la moitié basse de la palette de durées.
+
+### 3.2 Les six courbes non représentables par une Bézier
+
+Constantes : `c₄ = 2π/3`, `c₅ = 2π/4.5`, et pour Bounce `n₁ = 7.5625`, `d₁ = 2.75`.
+
+**easeInElastic** vaut 0 en 0, 1 en 1, et ailleurs
+`-2^(10x - 10) · sin((10x - 10.75)·c₄)`.
+
+**easeOutElastic** vaut 0 en 0, 1 en 1, et ailleurs
+`2^(-10x) · sin((10x - 0.75)·c₄) + 1`.
+
+**easeInOutElastic** vaut 0 en 0, 1 en 1, et ailleurs
+`x < 0.5 ? -(2^(20x - 10) · sin((20x - 11.125)·c₅))/2 : (2^(-20x + 10) · sin((20x - 11.125)·c₅))/2 + 1`.
+
+**easeOutBounce** se définit par morceaux, et c'est la seule des trente qui le fasse :
+`x < 1/d₁ ? n₁x²`, sinon `x < 2/d₁ ? n₁(x - 1.5/d₁)² + 0.75`, sinon
+`x < 2.5/d₁ ? n₁(x - 2.25/d₁)² + 0.9375`, sinon `n₁(x - 2.625/d₁)² + 0.984375`.
+
+**easeInBounce** vaut `1 - easeOutBounce(1 - x)`.
+
+**easeInOutBounce** vaut `x < 0.5 ? (1 - easeOutBounce(1 - 2x))/2 : (1 + easeOutBounce(2x - 1))/2`.
+
+Ces six-là dépassent elles aussi l'intervalle [0,1] pour Elastic, avec les mêmes conséquences que
+Back sur une opacité, et elles demandent de la durée pour se lire : un rebond dans 0,10 s est un
+tremblement. La palette de durées de la section 4 et cette famille de courbes se contredisent en
+partie, et l'éditeur doit le dire au moment du choix plutôt que laisser produire un résultat sale.
+
+### 3.3 Où ces trente vivent dans le code
+
+Un fichier neuf, `src/zenraymedia/easings.js`, qui exporte la table `EASINGS` sous la forme
+`{ [nom]: { label, bezier, fn } }` où `bezier` vaut `null` pour les six dernières et `fn` est la
+fonction de la formule, utilisée pour l'échantillonnage et pour les tests. Ce fichier est pur, sans
+API navigateur, comme `colors.js` et `chunkPolicy.js`, donc testable sans DOM.
+
+Le test qui compte n'est pas d'appeler chaque fonction, c'est de vérifier les trois propriétés qui
+rendent une courbe utilisable : `fn(0) = 0`, `fn(1) = 1` à 1e-9 près, et pour les vingt-quatre
+premières un écart maximal sous 1e-3 entre la formule et l'évaluation de la Bézier sur cent points.
+
+---
+
+## 4. Les presets de durée
+
+Sept valeurs, de 0,05 s à 0,35 s par pas de 0,05, avec leur nombre d'images aux deux cadences que le
+projet connaît, `format.time.fps` valant 30 pour les deux formats temporels de `formats.js` :
+
+| Preset | Secondes | Millisecondes | Images à 30 i/s | Images à 60 i/s |
+|---|---|---|---|---|
+| 1 | 0,05 | 50 | 1,5 | 3 |
+| 2 | 0,10 | 100 | 3 | 6 |
+| 3 | 0,15 | 150 | 4,5 | 9 |
+| 4 | 0,20 | 200 | 6 | 12 |
+| 5 | 0,25 | 250 | 7,5 | 15 |
+| 6 | 0,30 | 300 | 9 | 18 |
+| 7 | 0,35 | 350 | 10,5 | 21 |
+
+Cette palette est celle des **micro-transitions**, et elle est juste pour cela : au-delà de 0,35 s
+une entrée d'interface commence à se faire attendre, en dessous de 0,10 s elle se perçoit comme un
+changement d'état plutôt que comme un mouvement. Elle ne couvre pas, et ne prétend pas couvrir, les
+durées d'un plan vidéo, qui se comptent en secondes et se composent en posant le clip plus tard sur
+la piste plutôt qu'en l'étirant.
+
+Le pas de 0,05 s sert aussi d'unité de quantification à toute la timeline, y compris aux instants de
+départ, ce qui garantit qu'un clip déplacé à la souris retombe toujours sur une valeur exactement
+représentable et jamais sur 0,2333.
+
+La valeur par défaut d'une nouvelle animation est 0,20 s, quatrième preset, avec `outQuart`. Ce
+couple est proche de ce que le code produit déjà sans le dire, `compile.js` L251 employant 0,3 s et
+`cubic-bezier(.2,.75,.2,1)`, qui est une courbe de sortie de la même famille.
+
+---
+
+## 5. L'export
+
+### 5.1 Ce que produit le HTML autonome
+
+Une piste devient une règle `@keyframes` et une déclaration `animation`, générées dans
+`composedPage()` (`compile.js` L203), à côté du CSS déjà émis. Pour la pièce donnée en exemple à la
+section 1.2 :
+
+```css
+@keyframes zrm-a-cmp-1a2b3c4 {
+  0%      { opacity: 0; transform: translate3d(0, 24px, 0); animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1); }
+  100%    { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+[data-zrm-instance="cmp-1a2b3c4"] {
+  animation: zrm-a-cmp-1a2b3c4 0.25s linear 0.20s 1 both;
+}
+```
+
+Deux choses méritent d'être expliquées, parce qu'elles ne se devinent pas. La courbe n'est pas posée
+sur la déclaration `animation` mais **dans le keyframe de départ**, par `animation-timing-function` :
+c'est ce qui permet à deux clips successifs d'une même piste de porter deux courbes différentes,
+puisque cette propriété s'applique au segment qui commence à ce pourcentage. La valeur `linear` sur
+la déclaration est donc volontaire, elle ne fait qu'éviter d'écraser les courbes des segments. Et le
+mode de remplissage `both` est indispensable : sans lui, la pièce s'affiche à son état final pendant
+le délai, puis saute à son état de départ au démarrage.
+
+Quand plusieurs clips existent, il n'y a toujours qu'une règle `@keyframes` par pièce, dont les
+pourcentages sont calculés sur la durée totale de la timeline, et non sur la durée du clip.
+L'animation dure alors le temps entier de la timeline, avec un délai nul. Cette normalisation évite
+d'empiler plusieurs animations sur un même élément, ce qui multiplierait les conflits de `transform`.
+
+Pour les six courbes Elastic et Bounce, deux voies. La première est la fonction CSS `linear()`, qui
+accepte une liste de points et exprime donc n'importe quelle courbe à la précision choisie ; elle est
+disponible dans les navigateurs récents, mais je ne l'ai pas testée ici et il faut la vérifier par un
+essai d'une ligne avant de s'y fier. La seconde, qui fonctionne partout et qui sert de repli, est
+d'échantillonner la courbe directement en pourcentages de keyframes, un point par image de la clip à
+la cadence du format, soit au plus onze points pour la plus longue durée de la palette à 30 i/s.
+Cette seconde voie a un avantage discret : elle produit exactement ce que la capture verra, puisque
+la capture échantillonne aux mêmes instants.
+
+Enfin, la question de `prefers-reduced-motion`. Les deux animations existantes sont enfermées dans
+`@media (prefers-reduced-motion: no-preference)` (`compile.js` L165 et L250), ce qui est le bon
+réflexe pour une page qu'on publie. Ce ne l'est pas pour un rendu vidéo : si le Chromium de la Forge
+annonce une préférence de mouvement réduit, la page rendue serait figée et le fichier sortirait
+immobile sans qu'aucune erreur ne le signale. La compilation doit donc émettre la requête média pour
+les sorties web et publiées, et l'omettre pour la voie de la Forge. C'est une hypothèse de ma part
+sur le comportement par défaut de Playwright, que je n'ai pas mesurée ; elle se tranche en lisant la
+valeur de `window.matchMedia('(prefers-reduced-motion: reduce)').matches` dans le script de rendu,
+ce qui tient en une ligne à ajouter au préchauffage de `forge.js`.
+
+### 5.2 Ce qui devient impossible à l'export PNG
+
+Un PNG est un instant. Tout ce qui distingue deux instants disparaît : la durée, le décalage entre
+pièces, la courbe, la boucle, et jusqu'à l'idée de mouvement. La seule question qui se pose est donc
+« quel instant », et c'est à cela que sert le champ `poster` de la timeline.
+
+Mais il y a plus grave qu'une perte, il y a un piège, et il est déjà armé dans le code
+d'aujourd'hui. `exportPng()` (`exporters.js` L111 à L157) sérialise le document dans un
+`foreignObject` SVG chargé comme une image. Or une image SVG chargée de cette façon ne rejoue pas les
+animations CSS depuis un temps choisi ; au mieux elle les démarre à zéro, au pire elle ne les joue
+pas du tout. Avec le mode `both` qui rend l'état de départ pendant le délai, une pièce dont
+l'animation commence à `opacity: 0` sortirait **invisible** sur le PNG. C'est une inférence tirée de
+la lecture du code et non une mesure, mais elle est assez probable et assez coûteuse pour qu'on
+conçoive contre elle plutôt que d'attendre de la constater.
+
+La parade est simple et elle ne coûte rien : `compile()` reçoit un drapeau supplémentaire, appelons-le
+`freezeAt`, qui vaut `null` par défaut. Quand il porte un nombre, le compilateur **n'émet aucune
+règle `@keyframes`** et écrit à la place, en style en ligne sur chaque pièce, la valeur interpolée de
+chaque propriété à cet instant, calculée par la table des trente courbes. La page produite est
+strictement statique, donc le SVG la rend fidèlement, et par construction elle est identique à
+l'image que la Forge capturerait au même instant. Ce même drapeau sert au PDF, qui a exactement le
+même problème, `exportPdf()` passant par l'impression du navigateur.
+
+Deux autres conséquences déjà présentes dans le code méritent d'être notées ici puisqu'elles touchent
+la même sortie. Le canevas est rempli en `#ffffff` sans condition (`exporters.js` L148), donc aucune
+transparence ne survit à l'export PNG, ce qui vaut aussi pour une animation qui aurait laissé une
+opacité intermédiaire. Et une hauteur libre retombe sur `format.canvas.h || 1200` (L113), donc un
+article web animé serait coupé à 1200 px sans avertissement.
+
+### 5.3 Le tableau des cinq sorties
+
+| Sortie | Animation | Ce qui se passe |
+|---|---|---|
+| Article web (HTML) | Complète | `@keyframes` réelles, sous `prefers-reduced-motion`, sans boucle. |
+| 1:1, 4:5, 9:16 (PNG) | Aucune | Gel à `timeline.poster`, styles en ligne, aucune règle émise. |
+| A4 (PDF) | Aucune | Même gel, même raison, chemin d'impression. |
+| Vidéo 16:9 (MP4) | Complète | Horloge virtuelle de `forge.js`, une capture par image. |
+| Habillage alpha (MOV) | Complète | Identique, avec `omitBackground` (`forge.js` L87). |
+
+### 5.4 Ce que le Critique doit apprendre
+
+Trois contrôles seulement, tous mesurables, et aucun n'est cosmétique. Une pièce dont l'animation
+n'est pas terminée à `timeline.poster` produit un poster tronqué, donc c'est un blocage et non un
+avertissement, parce que le fichier sortirait faux. Un clip plus court que deux images à la cadence
+du format est invisible et vaut un avertissement, ce qui vise directement le premier preset à 30 i/s.
+Enfin une opacité qui sort de [0,1] du fait d'une courbe Back ou Elastic vaut un avertissement
+nommant la courbe, puisque le navigateur l'écrête en silence.
+
+---
+
+## 6. Ordre de réalisation, et sa place dans le tableau
+
+Ce système ne passe pas devant C1. La raison est la même que celle qui rend C1 bloquante pour tout le
+reste : animer trois cartes qui affichent toutes le même titre ne produit rien qu'on ait envie de
+garder, et le panneau Détails que C1 fait naître est exactement l'endroit où les réglages d'un clip
+iront se poser. L'animation est une carte C8, après C7 ou juste avant, selon que Matthieu veut
+l'arbre de conteneurs avant le mouvement.
+
+L'ordre interne, lui, tient en cinq pas dont chacun se vérifie seul. `easings.js` et ses tests, sans
+aucune interface. Le modèle, `item.anim` et `composition.timeline`, avec la modification obligatoire
+de `normalizeComposition` et le test d'aller-retour à l'enregistrement. La compilation des
+`@keyframes` et le drapeau `freezeAt`, vérifiés par comparaison de chaînes. La timeline dans l'onglet
+du bas, avec la lecture par `getAnimations()`. Le Critique en dernier, parce qu'il ne peut contrôler
+que ce qui existe.

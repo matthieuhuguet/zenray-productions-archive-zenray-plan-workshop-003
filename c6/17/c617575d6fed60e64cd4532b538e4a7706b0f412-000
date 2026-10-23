@@ -1,0 +1,328 @@
+# Documentation, thèmes, formats et preuves
+
+## Inventaire avant ajout de l'audit
+
+| Ensemble | Mesure | Signification |
+|---|---:|---|
+| Dossier `docs/zenraymedia` | 5 020 fichiers, environ 2,2 Go | La masse provient surtout des références visuelles |
+| Markdown | 421 fichiers, 143 880 lignes | La documentation dépasse largement la surface du moteur |
+| Catalogue 05 A à D | 1 024 identifiants uniques | 16 familles, 8 sous-familles et 8 variantes |
+| Volume A corrigé | 256 prompts | Seulement les familles 01 à 04 |
+| Ateliers | 128 dossiers | Concentrés sur les familles 01 et 04 |
+| Thèmes chargeables | 8 | Sept HTML et un thème à tokens JavaScript |
+| Paquets à composants | 7 | 25, 25, 26, 25, 25, 36 et 48 pièces, soit 210 |
+| Familles présentes dans le runtime | 3 sur 16 | Presse, jeu vidéo et musique |
+| Gabarits HTML racine | environ 3,85 Mo | Six sur sept embarquent déjà des polices en data URL ; le plus lourd atteint environ 1,39 Mo |
+| Catalogue de polices runtime | `fonts.js` environ 564 Ko ; actifs publics environ 52 Mo | Les actifs restent chargés à la demande, mais tout l'index JavaScript rejoint la surface Media |
+| Formats déclarés | 27 | Sept historiques et vingt formats ajoutés pour le web |
+| Formats dans l'arbre de déclinaisons | 7 | Vingt sorties restent invisibles dans la vue globale |
+
+Le rapport entre 1 024 thèmes décrits et huit thèmes chargeables vaut 0,78 %. Celui entre les
+paquets de composants et le catalogue vaut 0,68 %. Ce n'est pas un échec de production : c'est une
+preuve que le catalogue sert encore de vision, non d'inventaire logiciel.
+
+## Hiérarchie documentaire recommandée
+
+Le dépôt possède une vision verbatim, un KANBAN vivant, de vastes archives de conception, des
+rapports de génération, des captures et plusieurs contrats techniques écrits à des dates
+différentes. Les contradictions apparaissent parce que chaque document mélange parfois quatre
+fonctions : conserver l'histoire, décrire le présent, décider le futur et enseigner le workflow.
+
+Une hiérarchie simple résout ce conflit :
+
+1. `VISION.md` conserve uniquement la vision verbatim et ses lectures datées ;
+2. `CAPABILITES.md` devient l'état produit généré, avec les cinq niveaux de preuve ;
+3. `KANBAN.md` devient le journal des cartes et des décisions en cours ;
+4. `CONTRATS/` contient les contrats versionnés du document, du thème, des formats, des artefacts et
+   de la publication ;
+5. `ADR/` garde les décisions irréversibles ou coûteuses, une par fichier ;
+6. `audits/` conserve les photographies comme celle-ci ;
+7. les archives gardent une bannière avec leur date et leur commit, sans prétendre décrire le
+   présent.
+
+Le README indexe ces catégories et ne répète aucun statut. Les métriques proviennent d'une commande
+de vérification, afin qu'un changement de thème ou de format ne rende pas l'index faux.
+
+## Documents vivants manquants
+
+| Document | Contenu minimal | Pourquoi il manque aujourd'hui |
+|---|---|---|
+| `CAPABILITES.md` | capacité, propriétaire, C/T/I/V/R, porte, exclusion, validation | Le KANBAN confond parfois code, test et produit fini |
+| `CONTRATS/DOCUMENT-V3.md` | schéma, identités, pages, variantes, migration, compatibilité | `document.js` possède une version sans protocole de migration |
+| `CONTRATS/THEME-PACKAGE-V1.md` | manifeste, fichiers, tokens, composants, nœuds, licence, preview | Trois formes de thème et plusieurs sources de métadonnées coexistent |
+| `CONTRATS/FORMAT-PROFILE-V1.md` | dimensions, zones, poids, canal, texte, alpha, test | Les formats donnent des valeurs, sans contrat de fichier final |
+| `CONTRATS/ARTIFACT-V1.md` | manifeste, hash, provenance, QA, reçu | Exporter retourne des résultats hétérogènes |
+| `CONTRATS/PUBLICATION-V1.md` | états, transitions, destination, retries, reçu, suppression | La galerie n'a encore aucun objet métier |
+| `TEST-STRATEGY.md` | pyramide, navigateurs, fixtures, golden files, budgets | Les tests unitaires verts donnent une confiance trop large |
+| `ACCESSIBILITY.md` | clavier, ARIA, contraste, langues, motion | Aucun seuil partagé ne gouverne l'éditeur ou les sorties |
+| `SECURITY.md` | iframe, HTML de thème, liens, actifs distants, OAuth futur | Le pont de sélection et les thèmes HTML créent une frontière de confiance |
+| `PERFORMANCE-BUDGETS.md` | ouverture, geste, compilation, export, taille de bundle | Aucune régression de fluidité ne possède de porte |
+| `RECOVERY.md` | dirty state, autosave, conflit, révision, restauration | L'utilisateur ne sait pas ce que le navigateur ou Create a réellement gardé |
+| `RELEASE-CHECKLIST.md` | tests, build, E2E, artefacts, validation humaine | Une porte verte de carte peut devenir un faux statut de release |
+
+Ces documents doivent rester courts et reliés à des tests. Recréer un nouveau corpus de 100 000
+lignes reproduirait le problème ; la documentation vivante décrit les contrats, tandis que le code
+et les rapports générés fournissent les chiffres.
+
+## Contrat de thème actuel
+
+Trois formes existent en pratique :
+
+1. un thème JavaScript à tokens, découvert par `*.theme.js` ;
+2. un gabarit HTML racine, découvert par son nom `T-FF-S-V--slug.html` ;
+3. un dossier de composants avec `component-registry.json`, `parts/*.html`, `tokens.css` et
+   `theme.json`, qui a besoin d'un HTML racine homonyme pour apparaître comme thème.
+
+`themes/README.md` n'enseigne que les deux premières formes. Il affirme qu'un dépôt de fichier
+suffit et que le thème apparaît dans le Deck, alors que l'interface a déplacé les thèmes dans la
+Palette et que le paquet dossier dominant demande plusieurs pièces coordonnées.
+
+Le même README affirme qu'un gabarit est contrôlé au chargement pour son titre, ses blocs et son
+squelette HTML. `inspectTemplate` implémente bien ce diagnostic, mais seuls les tests l'appellent ;
+`loadTheme` ne l'emploie jamais. Le contrat écrit promet donc une porte que le runtime contourne,
+et aucune règle n'interdit script ou ressource externe dans le document exporté.
+
+### Métadonnées en concurrence
+
+- le nom du HTML racine fournit l'identité et la famille ;
+- son commentaire `zr-theme` fournit formats, description, mesures et polices après chargement ;
+- `theme.json` existe dans le dossier mais le registre runtime ne s'en sert pas pour lister le
+  thème ;
+- `component-registry.json` décrit les pièces ;
+- `componentCatalog.js` convertit silencieusement les chemins documentaires `components/*.html`
+  vers les fichiers réels `parts/*.html` par leur seul basename ;
+- les entrées HTML affichent `F-web-article` avant leur premier chargement, même si leur header
+  déclare plusieurs formats.
+
+Cette multiplicité permet la progression historique, mais elle rend impossible une validation
+atomique du paquet. Le manifeste versionné doit devenir la seule source de vérité ; un index léger,
+généré au build, garde alors la promesse de chargement paresseux pour 1 024 thèmes.
+
+### Tokens et composants
+
+`componentCatalog.js` importe manuellement six feuilles `tokens.css`. Le paquet Spotify
+`T-09-1-1` n'y figure pas. Ses composants utilisent aujourd'hui surtout des valeurs de repli, si
+bien que l'absence peut rester invisible ; elle demeure toutefois une dette de contrat. À 1 024
+thèmes, une table manuelle ne peut pas rester fiable.
+
+Le commentaire de ce fichier annonce 162 composants, alors que les sept paquets en contiennent
+210. Le registre doit produire son propre nombre, son hash et la liste des fichiers manquants.
+
+Le schéma de propriétés n'est pas seulement incomplet, il n'est pas exécuté comme un contrat. Les
+sept registres cumulent des champs texte, booléens, couleurs, nombres et choix, mais l'inspecteur
+Lego ne respecte pas tous leurs types ni leurs options, tandis que l'inspecteur des calques
+composants ne les expose pas. Une propriété Spotify porte même `key: "16"` et `type: "9"`, forme
+qu'un manifeste validé devrait refuser. Il faut donc tester le registre contre un schéma fermé,
+puis générer les contrôles depuis ce même schéma au lieu de maintenir une interprétation partielle
+dans chaque voie de scène.
+
+Le validateur de thème présente la même dissociation. Il rend `motion`, `chrome` et `sound`
+optionnels et ne contrôle presque aucun champ imbriqué, tandis que le compilateur à tokens lit
+directement `theme.chrome`, `theme.motion`, les échelles, marges et palettes. Un thème JavaScript
+peut donc être déclaré valide puis échouer au rendu. Le header HTML fusionne en outre
+`typography` sur un seul niveau : un fragment partiel peut remplacer une sous-structure complète.
+La validation doit exécuter un schéma profond avec valeurs par défaut, puis compiler une fixture
+minimale avant d'indexer le thème.
+
+Les feuilles de style et identifiants d'une part ne sont pas isolés par instance. Les CSS extraits
+s'ajoutent au document global et certains fragments définissent des IDs fixes, par exemple
+`zrm-hud-t` et les bibliothèques de symboles. Répéter une part peut donc dupliquer des IDs ou faire
+agir un sélecteur sur une autre instance. Le contrat de paquet doit soit borner chaque feuille sous
+`[data-zrm-instance]` et préfixer les IDs à la compilation, soit employer un mécanisme d'isolation
+qui garde l'export autonome.
+
+Les documents placés dans les paquets dérivent eux aussi. Le README de `T-01-1-1` annonce encore
+que `theme.json`, `tokens.css` et `parts/*.html` restent à porter, alors que le paquet expose déjà
+25 parts. Il renvoie à `docs/zenraymedia/references-jpeg/...`, dossier absent, tandis que l'atelier
+réel vit sous `docs/zenraymedia/ateliers/T-01-1-1--LeMonde`. Le protocole de `T-04-1-1` conserve un
+tableau à « 1 / 307 » et « registre à faire » malgré 36 parts chargées. Comme ces chemins vivent
+dans du texte ou du code inline, le contrôle des liens Markdown ne les détecte pas. Un validateur
+de paquet doit aussi contrôler les chemins mentionnés dans ses manifestes et rapports.
+
+### Identité et évolution
+
+Une part doit posséder :
+
+- un identifiant de thème et de composant stable ;
+- une version de schéma ;
+- une vignette ;
+- une liste de propriétés typées avec valeur par défaut ;
+- des identifiants sémantiques pour les sous-nœuds ;
+- les formats supportés ;
+- les polices et actifs requis ;
+- licence, provenance et référence privée ;
+- un hash de contenu ;
+- une politique de migration des overrides.
+
+Le runtime peut ensuite refuser un paquet incomplet avant qu'il apparaisse dans la bibliothèque,
+au lieu de charger un HTML vide ou de retomber silencieusement sur une valeur neutre.
+
+## Stratégie pour les 1 024 thèmes
+
+La cible numérique ne doit pas conduire à produire 1 016 fichiers supplémentaires avant que le
+contrat tienne. Le chemin sûr suit quatre paliers :
+
+1. **Sept paquets représentatifs** : migrer les paquets actuels et prouver le manifeste ;
+2. **Seize familles** : livrer un thème par famille, soit seize thèmes, afin de tester toute la
+   taxonomie, les langues et les formats ;
+3. **Cent vingt-huit sous-familles** : un thème par sous-famille, avec score visuel et usage réel ;
+4. **Mille vingt-quatre variantes** : seulement si recherche, chargement paresseux, QA et
+   maintenance restent sous les budgets.
+
+Chaque palier exige un test de restitution produit : l'utilisateur retrouve le thème, le pose,
+modifie ses nœuds, change de version et exporte au moins deux formats sans perte. Un thème documenté
+mais non chargeable reste une exposition consignée, pas un thème acquis.
+
+## Polices
+
+Le mapping couvre 128 sous-familles avec 114 noms de familles distincts, plusieurs sous-familles
+partageant volontairement une police. La documentation doit donc réserver « 128 » aux mappings et
+« 114 » aux familles uniques.
+
+Le pipeline embarque les fichiers nécessaires dans l'HTML, ce qui constitue un bon choix pour
+l'autonomie. Il faut encore vérifier :
+
+- poids final contre `delivery.maxBytes` ;
+- glyphes réellement présents pour chaque langue ;
+- fallback visible et signalé ;
+- licence jointe au paquet lorsque nécessaire ;
+- chargement terminé avant capture PNG/PDF ;
+- cohérence entre l'aperçu, l'HTML exporté et le raster final.
+
+La coupe Anthropic Serif italique montre déjà pourquoi cette preuve compte : l'aperçu la déclare,
+mais `embedFonts` ne transforme en data URL que le fichier Romans et le réannonce en style normal.
+Le fichier autonome ne porte donc pas forcément le même italique.
+
+Six gabarits HTML racine contiennent déjà des polices en base64, puis `embedFonts` peut ajouter de
+nouvelles faces au moment de la sortie. Ce double mécanisme explique une partie des 3,85 Mo de
+gabarits et rend le poids difficile à attribuer. Le manifeste doit référencer les faces une seule
+fois ; le build les sert pour l'aperçu et l'exporteur les inline seulement dans l'artefact final.
+À la cible de 1 024 thèmes, une police copiée dans chaque HTML rendrait le catalogue intenable.
+
+Une fixture française et japonaise détecte mieux ces erreurs qu'une liste de familles installées.
+
+## Scripts de fabrication
+
+Les outils `zrm-*` forment une chaîne utile : chemins, inventaire, régions, crop, mesure d'étendue,
+palette, détection de police, génération, comparaison et contrôle. Aucun test dédié ne protège
+cependant leurs formats d'entrée et de sortie, tandis que certaines étapes dépendent du réseau ou
+du schéma d'un fournisseur de polices.
+
+Deux dossiers, `scripts/` et `Scripts/`, contiennent au moment de l'audit des copies identiques de
+18 outils `zrm-*` et d'autres générateurs. Cette duplication ne casse rien aujourd'hui, mais elle
+garantit une dérive dès qu'un seul exemplaire reçoit un correctif. La convention globale du dépôt
+réserve déjà les scripts à `Scripts/` ; une future migration doit choisir ce dossier, conserver si
+nécessaire de courts relais compatibles, puis tester que documentation et commandes n'appellent
+plus la copie en minuscules.
+
+## Formats et déclinaisons
+
+`formats.js` déclare 27 formats : article, trois images sociales historiques, A4, vidéo, overlay,
+plus vingt formats web, sociaux, publicitaires, print et à largeur libre. `DECLENSION_GROUPS` ne
+contient que trois groupes et sept formats. La vue qui prétend montrer « toutes les sorties d'un
+coup » n'en montre donc que 25,9 %.
+
+Un profil de destination doit regrouper les formats utiles par intention. Par exemple :
+
+- Instagram post : carré, portrait et carrousel ;
+- Instagram story ou reel : 9:16, zones d'interface et durée ;
+- LinkedIn : image paysage ou carrée, carrousel document si choisi ;
+- article : étroit, standard, large et aperçu social ;
+- print : A5, A4 et A3 ;
+- web ads : formats IAB réellement sélectionnés.
+
+Chaque profil déclare aussi poids, nombre de pages, type de fichier, texte, alpha, contraintes de
+canal et date de dernière vérification. Les dimensions de plateforme changent ; elles ne doivent
+pas rester des constantes non sourcées indéfiniment.
+
+`declensionState` appelle actuellement le Critique sans lui dire que la source est composée. Une
+branche de l'arbre peut donc afficher des avertissements fondés sur le Cut alors que le canevas
+contient des calques indépendants. Le futur arbre doit contrôler chaque variante rendue et son
+artefact, non simuler son état depuis l'ancien contenu.
+
+Les champs de livraison dépassent eux aussi leur preuve. Poids maximal, transparence, fond perdu,
+mode couleur et pagination apparaissent dans les profils, mais l'export ne les applique ni ne les
+mesure. L'Overlay sort sur fond opaque malgré `transparent:true`, et les formats print gardent un
+canevas unique dont le surplus est masqué. La documentation de format doit donc séparer
+`declared`, `enforced` et `verified`, avec un test d'artefact lié à chaque promesse vérifiée.
+
+## Tests observés
+
+Onze fichiers de tests ZenRayMedia couvrent l'application, les composants, la composition, le
+document, les calques, le layout, Lego, les sous-nœuds, les thèmes et le noyau. La suite actuelle
+est riche en tests unitaires et plusieurs cartes récentes découvrent effectivement un bogue en
+écrivant leur porte. C'est une pratique saine.
+
+Au commit final `2156228`, les onze fichiers ZenRayMedia exécutent seuls 498 cas verts : 493 après
+I2, puis cinq tests unitaires de `embedImages`. Le commit contient 771 cas globaux dans 58 fichiers.
+La vérification exécutée par la session d'intégration depuis l'arbre sale annonce 774 cas dans 59
+fichiers, car elle inclut trois tests Plan concurrents non suivis ; elle ne doit pas devenir la
+preuve du commit propre. Une porte de publication doit enregistrer le SHA, l'état Git et la liste
+exacte des fichiers testés, sans quoi un arbre sale rend la preuve plus large que le code livré.
+
+La recherche dans les suites Playwright du dépôt ne trouve toutefois aucun parcours
+ZenRayMedia. Les limites de jsdom apparaissent déjà dans les commentaires de test : les huit tests
+d'interface de la Plume peuvent passer alors que React signale une valeur CSS `left` égale à
+`NaN`. Ils prouvent la branche et ses contrôles, non le raccord réel du pointeur à la géométrie. Les
+tests de chaînes avaient en outre laissé passer un attribut HTML mal formé jusqu'à ce qu'un test
+emploie `DOMParser`.
+
+### Angles morts
+
+- chargement réel de l'iframe sandboxée et clic de sous-composant ;
+- glisser, redimensionnement, rotation, snapping et historique dans un navigateur ;
+- Plume avec vrais `PointerEvent`, fermeture proche du premier point, courbe après rotation ou
+  retournement, groupe verrouillé, insertion sans déformation et appartenance de page ;
+- sélection de groupe ou de page cachée ;
+- chargement d'un document ancien, migration, sauvegarde, conflit et reprise ;
+- Cut, composition ou format invalides dans un document Create, sans fallback silencieux vers le
+  format Web ni réenregistrement avec perte ;
+- changement entre deux projets Create, conservation du bon chemin et absence d'écrasement ;
+- transition lente du thème A vers le thème B lors de l'ouverture d'un document sans Cut : aucun
+  calcul ne doit employer A une fois que l'identité demandée vaut B ;
+- unicité des identifiants après suppression, création et duplication ;
+- cycle du navigateur Create, dont Annuler, changement de mode, nouvelle prop et erreur réseau ;
+- export PNG, PDF, lot, alpha, police et ressource distante ;
+- incorporation I7 appelée par HTML, PNG et PDF, avec CORS, réponse non-image, guillemets simples,
+  `data-src`, `srcset`, image CSS ou SVG, URL échappée, délai maximal, reprise et réouverture hors
+  ligne de l'artefact ;
+- comparaison visuelle de thèmes ;
+- format Poster sur gabarit HTML brut, dont le DOM rendu doit contenir exactement le nombre de
+  blocs annoncé par ses métadonnées ;
+- ajustement mesuré d'un gabarit HTML brut, dont le rendu doit réellement changer avec `scale` et
+  cesser de déborder plutôt que recompiler le même document jusqu'au plancher ;
+- accessibilité clavier, arbre, menus, focus et contraste ;
+- performance sur 50 pages, 200 nœuds et 1 024 entrées de catalogue ;
+- fuzz ou tests par propriétés des normaliseurs et de la géométrie ;
+- sécurité du HTML de thème, des liens et des messages d'iframe ;
+- conformité du schéma de chaque propriété de composant et rendu du bon contrôle d'interface ;
+- sélection additive, verrou effectif et alignement vertical dans le rendu compilé ;
+- connecteur sans fond, borné à une page, remappé lors de copie et duplication, puis encore lisible
+  après suppression d'une extrémité ;
+- intégrité d'une slide lorsque ses membres sont groupés, dissous, supprimés ou passés en Auto
+  Layout, y compris l'absence de superposition de toutes les pages lorsque l'ID actif devient
+  invalide ;
+- invalidation de `contentScale` par page après toute mutation visuelle ;
+- verrou du Cut, fusion sans perte de slot et unicité des blocs après suppressions répétées ;
+- thème minimal ou partiellement formé, qui doit échouer au chargement plutôt qu'au compilateur ;
+- absence de scripts, ressources externes et déclarations CSS injectées dans un export non autorisé ;
+- publication et reçu persistant.
+
+### Pyramide proposée
+
+| Niveau | Contenu | Porte |
+|---|---|---|
+| Fonctions pures | géométrie, normalisation, migration, résolution de variante | Vitest, cas limites et propriétés |
+| Contrats | fixtures documents, thèmes, formats, manifestes | validation et aller-retour sans perte |
+| Composants | panneaux et commandes avec états réalistes | Testing Library, sans simuler la preuve navigateur |
+| Navigateur | parcours complets Chrome et WebKit | Playwright avec vrais événements et iframe |
+| Artefacts | HTML, PNG, PDF, ZIP, vidéo plus tard | réouverture, métadonnées, dimensions, hash et golden images |
+| Usage | cinq tâches réelles chronométrées | budget de clics, erreurs et validation humaine |
+
+Les tests unitaires protègent le moteur. Les trois niveaux suivants protègent la promesse.
+
+## État des liens
+
+Le contrôle statique des 421 fichiers Markdown antérieurs à cet audit ne trouve aucun lien relatif
+cassé. Cette base est saine. Le risque documentaire ne vient donc pas de liens morts, mais de pages
+lisibles qui décrivent chacune un état différent du produit.

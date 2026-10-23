@@ -1,0 +1,1109 @@
+{
+  "calibrationMedia": null,
+  "probes": [
+    {
+      "role": "LM · titre-article",
+      "text": "d’agression",
+      "image": "LM__ARTICLE__TOP__DESKTOP__11.jpg",
+      "refAspect": 5.515625,
+      "refDensity": 0.29028026237328564,
+      "refInkHeight": 39,
+      "warning": null,
+      "verdict": {
+        "family": "Vollkorn",
+        "weight": "700",
+        "archetype": "humaniste",
+        "margin": 0.005409663175539481,
+        "decisive": false,
+        "dominantArchetype": "labeur",
+        "dominantShare": 0.6,
+        "rival": "Libre Baskerville 700 (labeur)"
+      },
+      "calibration": {
+        "family": "Libre Baskerville",
+        "weight": "700",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 2,
+        "rankAnyWeight": 2,
+        "agrees": false,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Vollkorn",
+          "weight": "700",
+          "total": 0.9023684245116947,
+          "ratio": 0.9943342776203966,
+          "weightMatch": 0.9419436507649463,
+          "overlap": 0.7220563649390972,
+          "rows": 0.9223428227902997
+        },
+        {
+          "family": "Libre Baskerville",
+          "weight": "700",
+          "total": 0.8969587613361553,
+          "ratio": 0.9759206798866855,
+          "weightMatch": 0.9480964119419337,
+          "overlap": 0.6877001025768549,
+          "rows": 0.9762492983074545
+        },
+        {
+          "family": "Rozha One",
+          "weight": "400",
+          "total": 0.8866296221040022,
+          "ratio": 0.9644808743169399,
+          "weightMatch": 0.9595467281871779,
+          "overlap": 0.6646528250510552,
+          "rows": 0.9534095185567667
+        },
+        {
+          "family": "Literata",
+          "weight": "400",
+          "total": 0.8861538683962559,
+          "ratio": 0.953257790368272,
+          "weightMatch": 0.9035713569954106,
+          "overlap": 0.7222835617328051,
+          "rows": 0.973666080568712
+        },
+        {
+          "family": "Neuton",
+          "weight": "400",
+          "total": 0.8852766922409117,
+          "ratio": 0.9107648725212465,
+          "weightMatch": 0.9847211275635972,
+          "overlap": 0.7039609298195542,
+          "rows": 0.9622564834179166
+        },
+        {
+          "family": "Merriweather",
+          "weight": "700",
+          "total": 0.8830028811293023,
+          "ratio": 0.9348441926345609,
+          "weightMatch": 0.9279001691657646,
+          "overlap": 0.725475774570194,
+          "rows": 0.9497561851547751
+        },
+        {
+          "family": "Literata",
+          "weight": "700",
+          "total": 0.8829287490503644,
+          "ratio": 0.9874125874125874,
+          "weightMatch": 0.8475146946077179,
+          "overlap": 0.7060849279306801,
+          "rows": 0.9928962521423963
+        },
+        {
+          "family": "PT Serif",
+          "weight": "700",
+          "total": 0.8815286472057282,
+          "ratio": 0.9915730337078652,
+          "weightMatch": 0.9180276010706713,
+          "overlap": 0.6645760940192672,
+          "rows": 0.9255144109032718
+        },
+        {
+          "family": "Arvo",
+          "weight": "400",
+          "total": 0.8795548853239142,
+          "ratio": 0.9915730337078652,
+          "weightMatch": 0.8833196384552177,
+          "overlap": 0.6563934019595684,
+          "rows": 0.983840422816433
+        },
+        {
+          "family": "Source Serif 4",
+          "weight": "700",
+          "total": 0.8762746124098166,
+          "ratio": 0.9737931034482759,
+          "weightMatch": 0.8458166265704358,
+          "overlap": 0.7064012791531125,
+          "rows": 0.9826169984802201
+        },
+        {
+          "family": "Newsreader",
+          "weight": "700",
+          "total": 0.8754787825273808,
+          "ratio": 0.9390934844192634,
+          "weightMatch": 0.9247181184701756,
+          "overlap": 0.7091584158415841,
+          "rows": 0.9221795293513244
+        },
+        {
+          "family": "Neuton",
+          "weight": "700",
+          "total": 0.8724440244695866,
+          "ratio": 0.9915730337078652,
+          "weightMatch": 0.8338906518890414,
+          "overlap": 0.6959175257731959,
+          "rows": 0.952942788375163
+        }
+      ]
+    },
+    {
+      "role": "LIBE · titre-une",
+      "text": "de Jordan Bardella",
+      "image": "LIBE__01__HOME_TOP.jpg",
+      "refAspect": 9.1484375,
+      "refDensity": 0.5718998350577298,
+      "refInkHeight": 27,
+      "warning": "sonde peu discriminante : 9.1 de chasse, ~14 px par signe. Viser une chasse < 12 et > 14 px par signe — un mot court sur du gros texte, pas une phrase entière.",
+      "verdict": {
+        "family": "Anton",
+        "weight": "400",
+        "archetype": "condense",
+        "margin": 0.0539840856274626,
+        "decisive": true,
+        "dominantArchetype": "condense",
+        "dominantShare": 0.8,
+        "rival": "Passion One 400 (display)"
+      },
+      "calibration": {
+        "family": "Anton",
+        "weight": "400",
+        "source": "what-the-google-font (Matthieu, 2026-07-25)",
+        "rank": 1,
+        "rankAnyWeight": 1,
+        "agrees": true,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Anton",
+          "weight": "400",
+          "total": 0.847503794506584,
+          "ratio": 0.9350982066609735,
+          "weightMatch": 0.9238381950932558,
+          "overlap": 0.6397711616193874,
+          "rows": 0.8621138866472166
+        },
+        {
+          "family": "Antonio",
+          "weight": "700",
+          "total": 0.8351690172650038,
+          "ratio": 0.8983774551665243,
+          "weightMatch": 0.8518166829650836,
+          "overlap": 0.6927445338850634,
+          "rows": 0.8973106916278901
+        },
+        {
+          "family": "Passion One",
+          "weight": "400",
+          "total": 0.7935197088791214,
+          "ratio": 0.8851095993953136,
+          "weightMatch": 0.9856146093548108,
+          "overlap": 0.6623156496819739,
+          "rows": 0.4783252288771029
+        },
+        {
+          "family": "Oswald",
+          "weight": "700",
+          "total": 0.7709207951152077,
+          "ratio": 0.9718189581554227,
+          "weightMatch": 0.875088489774515,
+          "overlap": 0.6021174466767313,
+          "rows": 0.40988450431998785
+        },
+        {
+          "family": "Teko",
+          "weight": "700",
+          "total": 0.7649954952071443,
+          "ratio": 0.8485507246376811,
+          "weightMatch": 0.9749223267625479,
+          "overlap": 0.61879152428783,
+          "rows": 0.46382852547574327
+        },
+        {
+          "family": "Bebas Neue",
+          "weight": "400",
+          "total": 0.7545669453251015,
+          "ratio": 0.9632792485055508,
+          "weightMatch": 0.970604759995241,
+          "overlap": 0.4348695068045546,
+          "rows": 0.44033761098806473
+        },
+        {
+          "family": "Saira Condensed",
+          "weight": "700",
+          "total": 0.7509704117953473,
+          "ratio": 0.9436379163108455,
+          "weightMatch": 0.8516263776328908,
+          "overlap": 0.6063851060851481,
+          "rows": 0.37462846771361086
+        },
+        {
+          "family": "Antonio",
+          "weight": "400",
+          "total": 0.749553985187138,
+          "ratio": 0.8582408198121264,
+          "weightMatch": 0.7322315500984456,
+          "overlap": 0.5424921626751402,
+          "rows": 0.8699251337299823
+        },
+        {
+          "family": "Asap Condensed",
+          "weight": "700",
+          "total": 0.7448591105287337,
+          "ratio": 0.9632792485055508,
+          "weightMatch": 0.9001291129981096,
+          "overlap": 0.5010014254524459,
+          "rows": 0.38285825959434655
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "total": 0.7241350418288204,
+          "ratio": 0.9840336134453781,
+          "weightMatch": 0.8277075233413489,
+          "overlap": 0.4461640036973458,
+          "rows": 0.4083693024217626
+        },
+        {
+          "family": "Fjalla One",
+          "weight": "400",
+          "total": 0.7214524386873183,
+          "ratio": 0.8667805294619982,
+          "weightMatch": 0.7859129424795025,
+          "overlap": 0.5501184637126943,
+          "rows": 0.5604760121837987
+        },
+        {
+          "family": "Teko",
+          "weight": "400",
+          "total": 0.7208782804665191,
+          "ratio": 0.8787361229718189,
+          "weightMatch": 0.8105621056548878,
+          "overlap": 0.5655151876116736,
+          "rows": 0.4620087607316146
+        }
+      ]
+    },
+    {
+      "role": "FIGARO · titre-article",
+      "text": "Bordeaux",
+      "image": "FIGARO__17__ARTICLE_TOP.jpg",
+      "refAspect": 5.6328125,
+      "refDensity": 0.4097393015248401,
+      "refInkHeight": 19,
+      "warning": "sonde peu discriminante : 5.6 de chasse, ~13 px par signe. Viser une chasse < 12 et > 14 px par signe — un mot court sur du gros texte, pas une phrase entière.",
+      "verdict": {
+        "family": "Merriweather",
+        "weight": "700",
+        "archetype": "labeur",
+        "margin": 0.01903814991454622,
+        "decisive": false,
+        "dominantArchetype": "labeur",
+        "dominantShare": 0.6,
+        "rival": "Playfair Display 700 (didone)"
+      },
+      "calibration": {
+        "family": "Merriweather",
+        "weight": "700",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 1,
+        "rankAnyWeight": 1,
+        "agrees": true,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Merriweather",
+          "weight": "700",
+          "total": 0.854927875941238,
+          "ratio": 0.9903846153846154,
+          "weightMatch": 0.9997444075255314,
+          "overlap": 0.4572949829838621,
+          "rows": 0.9602227528618285
+        },
+        {
+          "family": "Playfair Display",
+          "weight": "700",
+          "total": 0.8358897260266918,
+          "ratio": 0.9902912621359223,
+          "weightMatch": 0.9864096582029038,
+          "overlap": 0.4044432500223954,
+          "rows": 0.9438303814852947
+        },
+        {
+          "family": "Lato",
+          "weight": "700",
+          "total": 0.8320119040383415,
+          "ratio": 1,
+          "weightMatch": 0.9831932773109244,
+          "overlap": 0.3613900015606305,
+          "rows": 0.9724405621363518
+        },
+        {
+          "family": "Lora",
+          "weight": "700",
+          "total": 0.8204537315827038,
+          "ratio": 0.9549668874172186,
+          "weightMatch": 0.9731308411214953,
+          "overlap": 0.40267940950593056,
+          "rows": 0.948418388865473
+        },
+        {
+          "family": "Neuton",
+          "weight": "700",
+          "total": 0.8191198953483737,
+          "ratio": 0.9549668874172186,
+          "weightMatch": 0.9073103367792505,
+          "overlap": 0.4584082002840666,
+          "rows": 0.9563456699101194
+        },
+        {
+          "family": "PT Serif",
+          "weight": "700",
+          "total": 0.8187850461846904,
+          "ratio": 0.9388020833333334,
+          "weightMatch": 0.9710014519724328,
+          "overlap": 0.4142469010018679,
+          "rows": 0.9592815251629911
+        },
+        {
+          "family": "Mulish",
+          "weight": "700",
+          "total": 0.8133076847020355,
+          "ratio": 0.9474375821287779,
+          "weightMatch": 0.9895503716241076,
+          "overlap": 0.3620327803318009,
+          "rows": 0.9587249531199076
+        },
+        {
+          "family": "Host Grotesk",
+          "weight": "700",
+          "total": 0.8119025410557542,
+          "ratio": 0.963903743315508,
+          "weightMatch": 0.8799798237432667,
+          "overlap": 0.4339249509755044,
+          "rows": 0.973733581437558
+        },
+        {
+          "family": "Domine",
+          "weight": "700",
+          "total": 0.8095357713185111,
+          "ratio": 0.9549668874172186,
+          "weightMatch": 0.9530633682044246,
+          "overlap": 0.3750151523022841,
+          "rows": 0.9551848706387163
+        },
+        {
+          "family": "Nunito Sans",
+          "weight": "700",
+          "total": 0.8089105456445731,
+          "ratio": 0.9388020833333334,
+          "weightMatch": 0.9774177611264357,
+          "overlap": 0.36492961224993825,
+          "rows": 0.9649531542254194
+        },
+        {
+          "family": "Inconsolata",
+          "weight": "700",
+          "total": 0.8080329525568192,
+          "ratio": 0.9730094466936572,
+          "weightMatch": 0.9600393948283811,
+          "overlap": 0.32298166690852803,
+          "rows": 0.9781625385320801
+        },
+        {
+          "family": "Frank Ruhl Libre",
+          "weight": "700",
+          "total": 0.8057771688816927,
+          "ratio": 0.899002493765586,
+          "weightMatch": 0.9940134771970639,
+          "overlap": 0.40311204706511566,
+          "rows": 0.9456327666546182
+        }
+      ]
+    },
+    {
+      "role": "FIGARO · menu-rubrique",
+      "text": "Patrimoine et Bourse",
+      "image": "FIGARO__04__MENU_OPEN.jpg",
+      "refAspect": 12.0859375,
+      "refDensity": 0.4839080459770115,
+      "refInkHeight": 12,
+      "warning": "sonde peu discriminante : 12.1 de chasse, ~7 px par signe. Viser une chasse < 12 et > 14 px par signe — un mot court sur du gros texte, pas une phrase entière.",
+      "verdict": {
+        "family": "Hind",
+        "weight": "700",
+        "archetype": "grotesque",
+        "margin": 0.014505953305780639,
+        "decisive": false,
+        "dominantArchetype": "grotesque",
+        "dominantShare": 0.4,
+        "rival": "Rajdhani 700 (technique)"
+      },
+      "calibration": {
+        "family": "Source Sans 3",
+        "weight": "700",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 34,
+        "rankAnyWeight": 34,
+        "agrees": false,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Hind",
+          "weight": "700",
+          "total": 0.9044614532718844,
+          "ratio": 0.973568281938326,
+          "weightMatch": 0.9916466068325654,
+          "overlap": 0.6825484440207074,
+          "rows": 0.9677586125343479
+        },
+        {
+          "family": "Cabin",
+          "weight": "700",
+          "total": 0.8939260535695591,
+          "ratio": 0.9479166666666666,
+          "weightMatch": 0.9094437458277056,
+          "overlap": 0.7558838503380702,
+          "rows": 0.9721554746318796
+        },
+        {
+          "family": "Rajdhani",
+          "weight": "700",
+          "total": 0.8899554999661038,
+          "ratio": 0.9866071428571429,
+          "weightMatch": 0.9219626092717372,
+          "overlap": 0.6764944362977658,
+          "rows": 0.9668582571581869
+        },
+        {
+          "family": "IBM Plex Sans Condensed",
+          "weight": "700",
+          "total": 0.8838659363291268,
+          "ratio": 0.9793148028442146,
+          "weightMatch": 0.9083419758455722,
+          "overlap": 0.6718509882889089,
+          "rows": 0.9737167620002101
+        },
+        {
+          "family": "Pragati Narrow",
+          "weight": "700",
+          "total": 0.8826026658389252,
+          "ratio": 0.9308338720103426,
+          "weightMatch": 0.9860561273862937,
+          "overlap": 0.6551106055513904,
+          "rows": 0.9767941826725616
+        },
+        {
+          "family": "Lato",
+          "weight": "700",
+          "total": 0.879381049123696,
+          "ratio": 0.966875,
+          "weightMatch": 0.8759699129057799,
+          "overlap": 0.7053103029870454,
+          "rows": 0.971031634336597
+        },
+        {
+          "family": "Teko",
+          "weight": "700",
+          "total": 0.8754176418916502,
+          "ratio": 0.993577392421323,
+          "weightMatch": 0.8263225112589904,
+          "overlap": 0.6992006178798996,
+          "rows": 0.9752318150630976
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": "700",
+          "total": 0.8749169095198229,
+          "ratio": 0.9181008902077151,
+          "weightMatch": 0.9438798520701164,
+          "overlap": 0.6859697820919834,
+          "rows": 0.9741279293773185
+        },
+        {
+          "family": "Sora",
+          "weight": "700",
+          "total": 0.8743817287120825,
+          "ratio": 0.900990099009901,
+          "weightMatch": 0.9295008925805167,
+          "overlap": 0.7242907500932109,
+          "rows": 0.9705818892679011
+        },
+        {
+          "family": "Passion One",
+          "weight": "400",
+          "total": 0.8663740091409761,
+          "ratio": 0.9586296056884293,
+          "weightMatch": 0.8381709456798081,
+          "overlap": 0.7084403905447071,
+          "rows": 0.9613387539593138
+        },
+        {
+          "family": "Rubik",
+          "weight": "700",
+          "total": 0.8658114502389629,
+          "ratio": 0.8686131386861314,
+          "weightMatch": 0.9920064858406703,
+          "overlap": 0.6710378830039897,
+          "rows": 0.9735717299176798
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "total": 0.8618049192793087,
+          "ratio": 0.9062683069712947,
+          "weightMatch": 0.9148604513064132,
+          "overlap": 0.6755173596873666,
+          "rows": 0.9801103939394045
+        }
+      ]
+    },
+    {
+      "role": "FT · masthead",
+      "text": "TIMES",
+      "image": "FT__01__HOME_TOP.jpg",
+      "refAspect": 4.3515625,
+      "refDensity": 0.3432454471323729,
+      "refInkHeight": 65,
+      "warning": null,
+      "verdict": {
+        "family": "Libre Baskerville",
+        "weight": "400",
+        "archetype": "labeur",
+        "margin": 0.005926233114083801,
+        "decisive": false,
+        "dominantArchetype": "labeur",
+        "dominantShare": 0.6,
+        "rival": "Bodoni Moda 700 (didone)"
+      },
+      "calibration": {
+        "family": "Bodoni Moda",
+        "weight": "400",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 70,
+        "rankAnyWeight": 2,
+        "agrees": false,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Libre Baskerville",
+          "weight": "400",
+          "total": 0.8839006593054101,
+          "ratio": 0.9703832752613241,
+          "weightMatch": 0.9653063765452901,
+          "overlap": 0.6780782323848674,
+          "rows": 0.8894690715427153
+        },
+        {
+          "family": "Bodoni Moda",
+          "weight": "700",
+          "total": 0.8779744261913263,
+          "ratio": 0.947935368043088,
+          "weightMatch": 0.9151110635209575,
+          "overlap": 0.7180406212664278,
+          "rows": 0.9193941745293276
+        },
+        {
+          "family": "Crimson Text",
+          "weight": "400",
+          "total": 0.8770618807100722,
+          "ratio": 0.9730700179533214,
+          "weightMatch": 0.9462942379128632,
+          "overlap": 0.6461623990320154,
+          "rows": 0.9224881012679339
+        },
+        {
+          "family": "Gelasio",
+          "weight": "400",
+          "total": 0.8743276742685278,
+          "ratio": 0.9856373429084381,
+          "weightMatch": 0.9631372711969027,
+          "overlap": 0.634669295462247,
+          "rows": 0.8660197505719138
+        },
+        {
+          "family": "Frank Ruhl Libre",
+          "weight": "700",
+          "total": 0.8655629274912816,
+          "ratio": 0.9892280071813285,
+          "weightMatch": 0.8020371213004477,
+          "overlap": 0.718899343999525,
+          "rows": 0.9273267243521568
+        },
+        {
+          "family": "Spectral",
+          "weight": "700",
+          "total": 0.8643514910233767,
+          "ratio": 0.9586919104991394,
+          "weightMatch": 0.9382029710677912,
+          "overlap": 0.6392846987456953,
+          "rows": 0.8962493659687086
+        },
+        {
+          "family": "PT Serif",
+          "weight": "400",
+          "total": 0.8597658186155338,
+          "ratio": 0.9084380610412927,
+          "weightMatch": 0.980392318405282,
+          "overlap": 0.6631756310294701,
+          "rows": 0.8728033992826231
+        },
+        {
+          "family": "Frank Ruhl Libre",
+          "weight": "400",
+          "total": 0.8589682136263853,
+          "ratio": 0.940754039497307,
+          "weightMatch": 0.9296151766810121,
+          "overlap": 0.6064041173979609,
+          "rows": 0.9713298418838976
+        },
+        {
+          "family": "Playfair Display",
+          "weight": "700",
+          "total": 0.8559153080144184,
+          "ratio": 0.9730700179533214,
+          "weightMatch": 0.8305824241899508,
+          "overlap": 0.654977737682973,
+          "rows": 0.9596717417501667
+        },
+        {
+          "family": "Literata",
+          "weight": "400",
+          "total": 0.8555759390671648,
+          "ratio": 0.9603448275862069,
+          "weightMatch": 0.9994293349890228,
+          "overlap": 0.629304544620466,
+          "rows": 0.7484785300641346
+        },
+        {
+          "family": "Cardo",
+          "weight": "700",
+          "total": 0.8515132711053413,
+          "ratio": 0.9858407079646018,
+          "weightMatch": 0.8534244723783042,
+          "overlap": 0.6415748850923597,
+          "rows": 0.8847945596670976
+        },
+        {
+          "family": "Libre Baskerville",
+          "weight": "700",
+          "total": 0.8506588206267669,
+          "ratio": 0.9298831385642737,
+          "weightMatch": 0.8560777361890197,
+          "overlap": 0.729516434145188,
+          "rows": 0.858674530304795
+        }
+      ]
+    },
+    {
+      "role": "FT · titre-une",
+      "text": "Waymo",
+      "image": "FT__01__HOME_TOP.jpg",
+      "refAspect": 3.6328125,
+      "refDensity": 0.24265232974910395,
+      "refInkHeight": 62,
+      "warning": null,
+      "verdict": {
+        "family": "Playfair Display",
+        "weight": "400",
+        "archetype": "didone",
+        "margin": 0.0017640864667238798,
+        "decisive": false,
+        "dominantArchetype": "labeur",
+        "dominantShare": 0.8,
+        "rival": "Frank Ruhl Libre 400 (labeur)"
+      },
+      "calibration": {
+        "family": "Playfair Display",
+        "weight": "400",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 1,
+        "rankAnyWeight": 1,
+        "agrees": true,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Playfair Display",
+          "weight": "400",
+          "total": 0.8813677098052966,
+          "ratio": 1,
+          "weightMatch": 0.9766617429837519,
+          "overlap": 0.6172132838283828,
+          "rows": 0.8859930206817523
+        },
+        {
+          "family": "Frank Ruhl Libre",
+          "weight": "400",
+          "total": 0.8796036233385727,
+          "ratio": 0.989247311827957,
+          "weightMatch": 0.9928728033860807,
+          "overlap": 0.591679273827534,
+          "rows": 0.9148602993025613
+        },
+        {
+          "family": "PT Serif",
+          "weight": "400",
+          "total": 0.8783703633266057,
+          "ratio": 0.9827956989247312,
+          "weightMatch": 0.9388393020086077,
+          "overlap": 0.6281137890960538,
+          "rows": 0.9510239728452299
+        },
+        {
+          "family": "Libre Baskerville",
+          "weight": "400",
+          "total": 0.877001480477077,
+          "ratio": 0.9607438016528925,
+          "weightMatch": 0.9446644241152886,
+          "overlap": 0.6827063599458728,
+          "rows": 0.8926563592218293
+        },
+        {
+          "family": "Zilla Slab",
+          "weight": "400",
+          "total": 0.8623518804276865,
+          "ratio": 0.9872611464968153,
+          "weightMatch": 0.9780819313753446,
+          "overlap": 0.5536851244453019,
+          "rows": 0.8924581013242641
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": "400",
+          "total": 0.8568684414984933,
+          "ratio": 0.9789473684210527,
+          "weightMatch": 0.978983268495824,
+          "overlap": 0.49731323410528316,
+          "rows": 0.9677515793389867
+        },
+        {
+          "family": "Figtree",
+          "weight": "400",
+          "total": 0.854394464810962,
+          "ratio": 0.9957173447537473,
+          "weightMatch": 0.9330528113184535,
+          "overlap": 0.5193006993006993,
+          "rows": 0.9520334432824145
+        },
+        {
+          "family": "Alegreya",
+          "weight": "400",
+          "total": 0.8526637879571094,
+          "ratio": 0.9354838709677419,
+          "weightMatch": 0.9830537220479103,
+          "overlap": 0.6079194201662759,
+          "rows": 0.8500076504323547
+        },
+        {
+          "family": "Alegreya Sans",
+          "weight": "400",
+          "total": 0.8525925324455857,
+          "ratio": 0.967741935483871,
+          "weightMatch": 0.9878985811662352,
+          "overlap": 0.4930599216520772,
+          "rows": 0.957621528811019
+        },
+        {
+          "family": "Vollkorn",
+          "weight": "400",
+          "total": 0.8514342780149731,
+          "ratio": 0.967741935483871,
+          "weightMatch": 0.9970457902511078,
+          "overlap": 0.5446187668631958,
+          "rows": 0.848723075446949
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "total": 0.8491840596587618,
+          "ratio": 0.9872611464968153,
+          "weightMatch": 0.9702246754256394,
+          "overlap": 0.4806098773616175,
+          "rows": 0.9395601345870818
+        },
+        {
+          "family": "Gelasio",
+          "weight": "400",
+          "total": 0.849166928502423,
+          "ratio": 0.9956989247311828,
+          "weightMatch": 0.9536136975420326,
+          "overlap": 0.47374214557629685,
+          "rows": 0.9588889604461779
+        }
+      ]
+    },
+    {
+      "role": "SUN · titre-une",
+      "text": "their kids",
+      "image": "SUN__02__HOME_MID.jpg",
+      "refAspect": 5.546875,
+      "refDensity": 0.4386721680420105,
+      "refInkHeight": 31,
+      "warning": null,
+      "verdict": {
+        "family": "Familjen Grotesk",
+        "weight": "700",
+        "archetype": "display",
+        "margin": 0.027390415837106108,
+        "decisive": false,
+        "dominantArchetype": "grotesque",
+        "dominantShare": 0.4,
+        "rival": "Plus Jakarta Sans 700 (grotesque)"
+      },
+      "calibration": {
+        "family": "Rajdhani",
+        "weight": "700",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 4,
+        "rankAnyWeight": 4,
+        "agrees": false,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Familjen Grotesk",
+          "weight": "700",
+          "total": 0.8515493725236942,
+          "ratio": 0.9861111111111112,
+          "weightMatch": 0.9908830148713649,
+          "overlap": 0.45272201340654394,
+          "rows": 0.9700615104355211
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "total": 0.8241589566865881,
+          "ratio": 0.9820193637621023,
+          "weightMatch": 0.9984046906492396,
+          "overlap": 0.41999693246306175,
+          "rows": 0.8390118239451803
+        },
+        {
+          "family": "Sora",
+          "weight": "700",
+          "total": 0.811535940166767,
+          "ratio": 0.9044585987261147,
+          "weightMatch": 0.9753790372848025,
+          "overlap": 0.41517296862429603,
+          "rows": 0.9822495275690156
+        },
+        {
+          "family": "Rajdhani",
+          "weight": "700",
+          "total": 0.8074802197503739,
+          "ratio": 0.9830985915492958,
+          "weightMatch": 0.927817314643558,
+          "overlap": 0.3943854000689916,
+          "rows": 0.885633560199887
+        },
+        {
+          "family": "Faustina",
+          "weight": "700",
+          "total": 0.8058861293052655,
+          "ratio": 0.9971910112359551,
+          "weightMatch": 0.9653109703080641,
+          "overlap": 0.35203196987961755,
+          "rows": 0.8502236021717388
+        },
+        {
+          "family": "Host Grotesk",
+          "weight": "700",
+          "total": 0.8056655260099934,
+          "ratio": 0.9766162310866575,
+          "weightMatch": 0.9973279179136384,
+          "overlap": 0.4116949353576088,
+          "rows": 0.7439608787456764
+        },
+        {
+          "family": "Schibsted Grotesk",
+          "weight": "700",
+          "total": 0.8001297433883796,
+          "ratio": 0.9712722298221614,
+          "weightMatch": 0.9946014883950117,
+          "overlap": 0.4238482753924206,
+          "rows": 0.7038134800251008
+        },
+        {
+          "family": "IBM Plex Sans Condensed",
+          "weight": "700",
+          "total": 0.7998738350244557,
+          "ratio": 0.9478873239436619,
+          "weightMatch": 0.9612361080296092,
+          "overlap": 0.43498327992197294,
+          "rows": 0.7937228310418568
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "total": 0.7977619297348557,
+          "ratio": 0.9342105263157895,
+          "weightMatch": 0.9267895979329703,
+          "overlap": 0.38757969224606964,
+          "rows": 0.9479728198637961
+        },
+        {
+          "family": "Pragati Narrow",
+          "weight": "700",
+          "total": 0.79561090862307,
+          "ratio": 0.8901408450704226,
+          "weightMatch": 0.9401816958984436,
+          "overlap": 0.46081606803582736,
+          "rows": 0.8920811457656961
+        },
+        {
+          "family": "Hind",
+          "weight": "700",
+          "total": 0.7949919444589628,
+          "ratio": 0.9659863945578231,
+          "weightMatch": 0.9796005759837368,
+          "overlap": 0.37046137928804684,
+          "rows": 0.7958747836385256
+        },
+        {
+          "family": "Archivo Narrow",
+          "weight": "700",
+          "total": 0.7945828717127579,
+          "ratio": 0.8845070422535212,
+          "weightMatch": 0.9499187756497948,
+          "overlap": 0.45876316794934774,
+          "rows": 0.8855661401615991
+        }
+      ]
+    },
+    {
+      "role": "SUN · navigation",
+      "text": "Fabulous",
+      "image": "SUN__02__HOME_MID.jpg",
+      "refAspect": 5.234375,
+      "refDensity": 0.4633179114342366,
+      "refInkHeight": 17,
+      "warning": "sonde peu discriminante : 5.2 de chasse, ~11 px par signe. Viser une chasse < 12 et > 14 px par signe — un mot court sur du gros texte, pas une phrase entière.",
+      "verdict": {
+        "family": "Rajdhani",
+        "weight": "700",
+        "archetype": "technique",
+        "margin": 0.0006499031012954237,
+        "decisive": false,
+        "dominantArchetype": "grotesque",
+        "dominantShare": 0.4,
+        "rival": "IBM Plex Sans Condensed 700 (condense)"
+      },
+      "calibration": {
+        "family": "Rajdhani",
+        "weight": "700",
+        "source": "atelier de calibrage (Matthieu, 2026-07-25)",
+        "rank": 1,
+        "rankAnyWeight": 1,
+        "agrees": true,
+        "installed": true
+      },
+      "ranking": [
+        {
+          "family": "Rajdhani",
+          "weight": "700",
+          "total": 0.9124644015291394,
+          "ratio": 0.9895522388059701,
+          "weightMatch": 0.9845505617977528,
+          "overlap": 0.7088769085147537,
+          "rows": 0.9517616691261562
+        },
+        {
+          "family": "IBM Plex Sans Condensed",
+          "weight": "700",
+          "total": 0.911814498427844,
+          "ratio": 0.9895522388059701,
+          "weightMatch": 0.9600049799246787,
+          "overlap": 0.7108801334336798,
+          "rows": 0.9849995767077666
+        },
+        {
+          "family": "Source Sans 3",
+          "weight": "700",
+          "total": 0.9111249213958604,
+          "ratio": 0.9463276836158192,
+          "weightMatch": 0.9806384403601458,
+          "overlap": 0.7509165716147955,
+          "rows": 0.9801431942439223
+        },
+        {
+          "family": "Host Grotesk",
+          "weight": "700",
+          "total": 0.9081772204751469,
+          "ratio": 0.9882005899705014,
+          "weightMatch": 0.9761927405294024,
+          "overlap": 0.6894027922996494,
+          "rows": 0.9727208718547238
+        },
+        {
+          "family": "Hind",
+          "weight": "700",
+          "total": 0.904357578266486,
+          "ratio": 0.9266943291839558,
+          "weightMatch": 0.9523108708572723,
+          "overlap": 0.7794343744942548,
+          "rows": 0.9805216780947982
+        },
+        {
+          "family": "Figtree",
+          "weight": "700",
+          "total": 0.9033414765051964,
+          "ratio": 0.9266943291839558,
+          "weightMatch": 0.9988571089308773,
+          "overlap": 0.7322336049044124,
+          "rows": 0.9748385522132631
+        },
+        {
+          "family": "Open Sans",
+          "weight": "700",
+          "total": 0.9021424425927451,
+          "ratio": 0.9178082191780822,
+          "weightMatch": 0.9423945174051797,
+          "overlap": 0.7884414949056644,
+          "rows": 0.9880037520180364
+        },
+        {
+          "family": "Lato",
+          "weight": "700",
+          "total": 0.8992551419937282,
+          "ratio": 0.9781021897810219,
+          "weightMatch": 0.9194243702089636,
+          "overlap": 0.7189302345452215,
+          "rows": 0.9822048292121619
+        },
+        {
+          "family": "Lora",
+          "weight": "700",
+          "total": 0.8983810021967038,
+          "ratio": 0.9781021897810219,
+          "weightMatch": 0.9961593328212445,
+          "overlap": 0.6812746597954746,
+          "rows": 0.9112449174611087
+        },
+        {
+          "family": "Alegreya Sans",
+          "weight": "700",
+          "total": 0.891986631007101,
+          "ratio": 0.9432835820895522,
+          "weightMatch": 0.9325623259289451,
+          "overlap": 0.7587471974998301,
+          "rows": 0.9267333094570922
+        },
+        {
+          "family": "Merriweather",
+          "weight": "700",
+          "total": 0.8914152645598207,
+          "ratio": 0.9776119402985075,
+          "weightMatch": 0.9368881892862414,
+          "overlap": 0.685506815576033,
+          "rows": 0.9576822282651629
+        },
+        {
+          "family": "Archivo Narrow",
+          "weight": "700",
+          "total": 0.8879416780132712,
+          "ratio": 0.9104477611940298,
+          "weightMatch": 0.9845505617977528,
+          "overlap": 0.7018278995189738,
+          "rows": 0.9846023084411946
+        }
+      ]
+    }
+  ]
+}

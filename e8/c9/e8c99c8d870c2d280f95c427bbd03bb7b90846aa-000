@@ -1,0 +1,325 @@
+# Architecture de l'interface ZenRayMedia, calquée sur l'éditeur UMG
+
+Document de conception. Il propose une organisation en huit zones, celles de l'éditeur de widgets
+d'Unreal, et il dit pour chacune ce qui existe déjà dans le dépôt, ce qui reste à écrire, et ce
+qu'elle devient quand la fenêtre rétrécit.
+
+Fichiers lus de ma main pour l'écrire : `src/zenraymedia/MediaApp.jsx` (1158 lignes, lu par blocs :
+en-tête et imports L1 à L60, `useFitScale` L50 à L70, `placementAt` et le glisser L582 à L638,
+la barre de commande et la structure L645 à L770, l'aperçu L826 à L876, la bibliothèque et la
+barre de rendu L1067 à L1158), `src/zenraymedia/media.css` (L1 à L30 et L190 à L270),
+`src/zenraymedia/composition.js` (L85 à L156 en entier, plus la liste des exports),
+`src/zenraymedia/compile.js` (L200 à L260), `docs/zenraymedia/KANBAN.md` (en entier),
+`src/config/colors.js` (en-tête et les sept couleurs). Je n'ai pas ouvert `formats.js`,
+`critic.js`, `forge.js` ni `componentCatalog.js` dans cette passe : tout ce que j'en dis vient des
+quatre documents `v1/` qui précèdent, et je le signale à chaque fois.
+
+Une chose reste vraie du début à la fin de ce document : le seul geste que Matthieu veut garder,
+poser un composant par l'un de ses quatre côtés, tient dans trois pièces nommées, `placementAt`
+(`MediaApp.jsx` L594), l'attribut `data-drop` et ses quatre règles `::before` (`media.css` L218 à
+L227), et la constante `PLACEMENTS` (`composition.js` L9). Aucune zone décrite ci-dessous ne les
+remplace, et deux zones les étendent sans les toucher.
+
+---
+
+## Vue d'ensemble
+
+Une remarque de mesure avant les zones, parce qu'elle commande la réponse au manque de place.
+La coquille actuelle est une grille figée : `media.css` L10 à L13 pose trois colonnes,
+`minmax(250px,300px) / 1fr / minmax(235px,275px)`, trois rangées, `auto / 1fr / minmax(205px,27vh)`,
+et une hauteur `calc(100vh - 150px)` avec un plancher de 560 px. Or les deux replis existent déjà
+en CSS, `[data-panes="two"]` L21 et `[data-panes="one"]` L22, et ils ne servent jamais : `MediaApp.jsx`
+L647 écrit `data-panes="three"` en dur, sans état ni condition. Le manque d'espace dont Matthieu se
+plaint tient donc pour une part à un mécanisme déjà écrit que personne n'appelle, et le remettre en
+service coûte un état et un attribut, non une refonte.
+
+Sur la géométrie générale, je propose de garder l'idée d'UMG sans copier ses proportions : les
+huit zones se rangent en trois colonnes et trois rangées, la colonne centrale portant l'aperçu,
+la colonne de gauche empilant palette et hiérarchie, la colonne de droite portant les détails,
+et les animations occupant la rangée basse à la place de la bibliothèque actuelle. C'est un
+déplacement de la bibliothèque, pas une réécriture : son balisage, ses trois onglets et ses
+charges utiles de glisser restent identiques.
+
+---
+
+## Zone 1 · Menu et barre d'onglets
+
+**Ce qu'elle contient.** Le champ unique de commande, la palette `⌘K`, le sélecteur de brief
+courant, et les cinq actions de document que sont ouvrir depuis Create, enregistrer, créer,
+dupliquer, supprimer. Dans le vocabulaire du projet ce n'est pas un menu au sens classique, c'est
+la barre de commande, et le contrat écrit en tête de `MediaApp.jsx` L3 à L6 interdit d'y ajouter
+une modale, une page de réglages ou un assistant.
+
+**Ce qui existe et se réutilise.** Tout, et tel quel : le bloc `div.zrm-panel.zrm-bar`
+(`MediaApp.jsx` L649 à L683), la liste de commandes construite L436 à L459, le rendu de la palette
+L672 à L681, le composant `Icon` importé L13 et le composant `CreateBrowser` importé L27, monté
+L904. Le style vient de `media.css` L60 et suivantes.
+
+**Ce qui est à créer.** Une rangée d'onglets de documents, un onglet par brief ouvert, qui
+remplacerait le `select` de la ligne 664 : ce dernier oblige à déplier une liste pour changer de
+document, là où UMG montre les documents ouverts en permanence. Je le propose sans l'imposer,
+parce qu'il ajoute de l'encombrement horizontal dans la zone la plus contrainte de l'écran.
+
+**Au rétrécissement.** La barre garde ses cinq boutons d'icône, qui coûtent peu, et c'est le champ
+de recherche qui cède en premier, jusqu'à se réduire à sa loupe seule, la palette s'ouvrant alors
+en plein panneau. Les onglets de documents, s'ils existent un jour, défilent horizontalement plutôt
+que de se replier sur deux lignes, une barre de commande qui grandit en hauteur mangeant l'aperçu.
+
+---
+
+## Zone 2 · Outils rapides
+
+**Ce qu'elle contient.** Ce qu'UMG met dans sa barre d'outils et que ZenRayMedia appelle autrement :
+le choix du format de sortie, le zoom de l'aperçu, l'affichage des zones de sécurité, le rendu clair
+ou sombre, et, quand la carte C7 aura livré les conteneurs, l'alignement et la distribution.
+
+**Ce qui existe et se réutilise.** Trois pièces, aujourd'hui dispersées. Les sept pastilles de
+format vivent dans `div.zrm-chips` de la barre de rendu (`MediaApp.jsx` L1141 à L1147, style
+`media.css` L237 à L246). Le basculement clair/sombre est le bouton `renderDark` de l'en-tête de
+l'aperçu (L836), et l'affichage des zones de sécurité le bouton `showSafe` juste après (L840),
+lequel ne s'affiche que si `format.safe` existe, condition importante que je conserve. Regrouper
+ces trois choses dans une seule barre d'outils est un déplacement de JSX, pas une réécriture.
+
+**Ce qui est à créer.** Un contrôle de zoom explicite. Aujourd'hui l'échelle d'affichage est
+calculée seule par `useFitScale` (L50 à L70) et rendue en lecture seule ; l'utilisateur ne peut ni
+zoomer à cent pour cent ni s'approcher d'un détail. Le garde-fou à respecter est écrit en toutes
+lettres L107 à L111 : `fitScale` est cosmétique, `contentScale` part dans le fichier exporté, et
+les confondre casserait les mesures du Critique. Un zoom manuel doit donc écrire dans `fitScale`
+uniquement, jamais dans l'autre.
+
+**Au rétrécissement.** Les pastilles de format perdent leur libellé long au profit de `f.short`,
+qui existe déjà dans les données puisque c'est lui qui s'affiche L1145, puis la barre se replie en
+un seul bouton qui ouvre la liste des formats en survol. Les bascules d'affichage restent, une
+icône coûtant vingt-deux pixels.
+
+---
+
+## Zone 3 · Palette
+
+**Ce qu'elle contient.** Le catalogue des composants du thème actif, groupés par famille, plus les
+images indexées et les icônes. Après C7, une quatrième catégorie apparaît, les conteneurs de mise
+en page, qui sont des pièces du modèle et non des parts de thème.
+
+**Ce qui existe et se réutilise.** La section `zrm-library` en entier (`MediaApp.jsx` L1068 à L1134,
+style `media.css` L253 et suivantes) : ses trois onglets, sa recherche, ses groupes repliables
+alimentés par `componentGroups`, ses cartes `zrm-library-card` et ses vignettes d'image. Le point
+à ne surtout pas casser tient dans les charges utiles du glisser, `application/x-zenray-component`
+posée L1123 et `application/x-zenray-image` posée L1096, que `onStructureDrop` relit L613 et L614 :
+ce sont elles qui font que poser depuis la bibliothèque sur un bord de composant fonctionne.
+
+**Ce qui est à créer.** La carte C4 du tableau, la bibliothèque qui suit la famille du thème plutôt
+que de supposer un inventaire de presse ; d'après le document `03-themes.md`, la donnée nécessaire
+est déjà déclarée dans `component-registry.json`, que je n'ai pas ouvert moi-même. À créer aussi
+le repli en colonne verticale, la disposition actuelle étant horizontale par construction
+(`media.css` L252, `display:flex` avec des groupes en colonnes juxtaposées).
+
+**Au rétrécissement.** Deux réponses, et je penche pour la seconde. Soit la palette reste en bas et
+son corps défile horizontalement, ce qu'il fait déjà. Soit elle passe à gauche en colonne étroite,
+les groupes s'empilant verticalement, et elle se réduit alors à un rail d'icônes de familles quand
+la largeur descend sous les 250 px que la grille lui garantit aujourd'hui. La seconde libère la
+rangée basse pour les animations, qui ont besoin de largeur et non de hauteur.
+
+---
+
+## Zone 4 · Viewport
+
+**Ce qu'elle contient.** L'aperçu, c'est-à-dire la page réelle rendue dans une `iframe`, avec ses
+zones de sécurité et, demain, la sélection directe et le dépôt par les quatre côtés.
+
+**Ce qui existe et se réutilise.** La section d'aperçu L827 à L875 : `div.zrm-stage-body` porteur
+de la mesure, `div.zrm-canvas` qui porte les dimensions réduites, l'`iframe` en `srcDoc` alimentée
+par un débounce de 220 ms (L219), le calque `zrm-safe-overlay` et ses quatre bandes L866 à L871,
+la boucle d'ajustement `onFrameLoad` (L243 à L268) qui attend les polices avant de mesurer.
+La décision d'architecture écrite L50 à L53 tient : l'iframe garde la taille réelle du canevas et
+seul un `transform: scale()` la réduit, faute de quoi les mesures du Critique deviendraient fausses.
+
+**Ce qui est à créer.** Deux choses, et elles sont exactement les cartes C2 et une extension de
+l'acquis. La sélection dans l'aperçu d'abord : `compile.js` L214 et L227 écrivent déjà
+`data-zrm-instance` sur chaque pièce, il suffit d'écouter le clic dans le document de l'iframe et
+de le remonter vers `setSelectedComponent`. Le dépôt par les quatre côtés dans l'aperçu ensuite,
+et c'est ici que l'acquis se joue : la bonne façon de le porter est d'appeler la fonction
+`placementAt` sans la modifier, l'événement lui fournissant déjà `currentTarget`, `clientX` et
+`clientY`, puis de dessiner le même repère bleu que `media.css` L218 à L227 mais en position
+absolue au-dessus de l'iframe, les coordonnées étant multipliées par `fitScale`. Réécrire un second
+calcul de placement serait la faute à ne pas commettre : deux quarts et deux moitiés définis à deux
+endroits divergeraient au premier ajustement.
+
+**Au rétrécissement.** L'aperçu ne se replie jamais, il est la raison d'être de l'écran ; il absorbe
+au contraire l'espace rendu par les panneaux repliés, `useFitScale` recalculant seul l'échelle
+puisqu'il observe la boîte du conteneur. Sous une certaine largeur, l'en-tête de l'aperçu perd sa
+ligne de mesures en police mono (L831 à L839) avant de perdre ses boutons.
+
+---
+
+## Zone 5 · Details
+
+**Ce qu'elle contient.** Les propriétés de la pièce sélectionnée : ses champs éditables déclarés
+par le thème, sa visibilité, son verrou, et, après C7, ses contraintes de mise en page, taille,
+ancrage, alignement.
+
+**Ce qui existe et se réutilise.** Presque rien, et c'est le constat central du tableau. Il n'existe
+aucun panneau de détails. Ce qui existe est l'écriture : `patchItem` (`composition.js` L134) sait
+déjà fusionner un correctif dans un item, et il est appelé deux fois dans `MediaApp.jsx`, L733 et
+L734, pour `hidden` et `locked`. Ces deux boutons sont donc le germe du panneau, aujourd'hui logés
+dans la ligne de structure. Se réutilise aussi la sélection courante, `selectedComponent` (L99),
+qui ne sert pour l'instant qu'au surlignage.
+
+**Ce qui est à créer.** La carte C1 en entier, et je reprends la recommandation du document
+`02-modele.md` parce qu'elle commande la forme de la zone : le panneau doit être un éditeur
+générique piloté par déclaration, qui lit la liste `props` de l'en-tête `<!--zrm …-->` du composant
+et rend un champ par entrée, jamais une série de champs codés en dur par type de composant. Trois
+réserves à porter dans le code, toutes vérifiées ou signalées ailleurs. Le moteur de gabarit ne
+fait qu'une passe et n'interprète pas le résultat d'une substitution (`htmlTemplate.js`, commentaire
+L30), donc un `default` valant `"{{title}}"` non renseigné doit rester non renseigné plutôt que
+d'être recopié dans `props`. Le script `scripts/zrm-build-theme.mjs` ne recopie que sept clés dans
+le registre qu'il écrit, d'après `02-modele.md`, donc une déclaration `props` ajoutée dans un
+en-tête serait perdue tant que ce script n'est pas modifié ; je n'ai pas rouvert ce fichier dans
+cette passe. Enfin les deux propriétés d'image `ratio` et `radius`, lues par `compile.js` L214 et
+que j'ai relues moi-même, sont les deux premiers champs à câbler, puisqu'elles n'attendent qu'une
+saisie.
+
+**Au rétrécissement.** Le panneau de détails est celui qui doit rester visible le plus longtemps
+après l'aperçu, parce qu'éditer une valeur est le geste de l'éditeur. Il se replie en dernier, et
+quand il se replie il devient un tiroir superposé au bord droit de l'aperçu, ouvert par la
+sélection, plutôt qu'une colonne qui disparaît. C'est la seule zone pour laquelle je propose une
+surimpression, que le contrat de sobriété de `MediaApp.jsx` L3 à L6 tolère puisqu'il interdit les
+modales et non les tiroirs contextuels.
+
+---
+
+## Zone 6 · Hiérarchie
+
+**Ce qu'elle contient.** L'arbre du document composé : les lignes, les pièces qu'elles portent, et
+demain les conteneurs imbriqués. C'est le lieu historique du geste des quatre côtés.
+
+**Ce qui existe et se réutilise.** Le bloc `div.zrm-structure` (`MediaApp.jsx` L701 à L742) et tout
+ce qui l'accompagne, à savoir `onStructureDragOver` L603, `onStructureDrop` L610, `onEmptyStructureDrop`
+L627, l'état `dropTarget`, l'attribut `data-drop` posé L721 et les sept boutons d'action par ligne
+L732 à L737. Se réutilisent aussi les fonctions du modèle qui acceptent déjà une cible et un
+placement, `addComponent` (`composition.js` L103), `addImage` L109 et `moveItem` L125, et le
+comportement d'`insertItem` L88, que j'ai lu : `left` et `right` insèrent dans la ligne cible,
+`above` et `below` créent une ligne neuve, ce qui est exactement la sémantique visible à l'écran.
+
+**Ce qui est à créer.** L'arbre. Aujourd'hui la profondeur est fixe et le code en dépend partout :
+`locate` (`composition.js` L76) rend un couple `{ rowIndex, itemIndex }` dont dépendent six
+fonctions exportées, et `normalizeComposition` L15 aplanit toute forme hors norme. Passer à un
+arbre exige donc la carte C7, une cinquième valeur `inside` dans `PLACEMENTS`, et un chemin de
+profondeur variable en lieu et place du couple. À créer aussi le repli et le dépli des branches,
+et la synchronisation avec la sélection venue de l'aperçu, qui est la carte C2 vue de l'autre côté.
+
+**Au rétrécissement.** La hiérarchie renonce d'abord à sa deuxième ligne de texte, la mention de
+groupe `zrm-structure-kind` (`media.css` L209), puis ses lignes passent d'une grille de plusieurs
+colonnes à une seule, la règle `repeat(auto-fit, minmax(min(100%,112px),1fr))` de `media.css` L197
+le faisant déjà seule. Point de vigilance : quand une ligne se replie sur une seule colonne, les
+placements `left` et `right` restent parfaitement valides dans le modèle mais deviennent illisibles
+à l'écran, les deux voisins horizontaux étant affichés l'un sous l'autre. Sous ce seuil, le repère
+de dépôt doit continuer d'annoncer le vrai placement, faute de quoi l'acquis se met à mentir.
+
+---
+
+## Zone 7 · Animations
+
+**Ce qu'elle contient.** Rien aujourd'hui, et il faut le dire ainsi. La zone servirait à poser des
+pistes, une par pièce animée, avec des clés et une tête de lecture accordée à la durée du format
+temporel.
+
+**Ce qui existe et se réutilise.** D'après le document `04-sortie.md`, que je reprends sans avoir
+rouvert `forge.js` moi-même, le mécanisme de capture existe et il est correct : la Forge met en
+pause `document.getAnimations()` et positionne `currentTime` image par image. La matière, elle, se
+limite à un fondu d'entrée désactivé partout. J'ai en revanche relu de ma main les deux keyframes
+de la voie composée dans `compile.js` L250 à L254, `zrm-lego-in` avec ses délais échelonnés sur les
+deuxième et troisième enfants, sous `@media (prefers-reduced-motion: no-preference)`.
+
+**Ce qui est à créer.** Tout le reste, et cette zone ne figure sur aucune carte du tableau. Une
+piste par pièce, des clés éditables, une courbe, un modèle de propriété animée, et surtout une
+décision de fond que je pose en question et non en réponse : les animations vivent-elles dans
+`item.props`, donc dans le modèle de composition déjà sérialisé, ou dans une structure `motion`
+parallèle du document. Le premier choix économise une migration et se marie avec C1 ; le second
+évite de mêler contenu et temps. Je ne tranche pas, faute d'avoir lu `document.js` dans cette passe.
+
+**Au rétrécissement.** La zone d'animation est la première à disparaître, entièrement, et sans
+état intermédiaire : une piste de temps illisible ne rend aucun service, et le format en cours
+n'est temporel que pour deux des sept formats. Le repli naturel est de ne la monter que lorsque
+`isTemporal(format)` vaut vrai, fonction déjà importée `MediaApp.jsx` L15 et déjà utilisée L834.
+
+---
+
+## Zone 8 · Barre du bas
+
+**Ce qu'elle contient.** L'état du document et les sorties : le verdict du Critique, la progression
+d'une tâche en cours, les boutons d'export, la publication, et le compteur d'actions.
+
+**Ce qui existe et se réutilise.** Le pied `footer.zrm-render` (`MediaApp.jsx` L1140 à L1156, style
+`media.css` L235) avec ses quatre boutons d'export conditionnés au genre du format, son bouton
+Publier, sa barre `zrm-progress` et son compteur d'actions L1154. Le verdict du Critique existe
+aussi, sous forme de bloc `zrm-verdict` stylé `media.css` L245 à L250, mais il vit dans le Deck et
+non dans la barre.
+
+**Ce qui est à créer.** Le rapatriement du verdict, en une seule pastille qui dit combien de
+problèmes bloquants restent et qui ouvre le détail au clic. La raison est écrite dans `01-editeur-actuel.md` :
+les exports passent déjà sous garde-fou du Critique sans exception, donc l'utilisateur découvre le
+blocage au moment où il clique Exporter, alors qu'il aurait pu le lire depuis le début. À créer
+également la sortie des pastilles de format vers la zone 2, qui laisse la barre du bas à son vrai
+rôle, l'état et la livraison.
+
+**Au rétrécissement.** La barre est déjà en `flex-wrap: wrap` (`media.css` L235) et passe donc à
+deux lignes, ce qui vole de la hauteur à l'aperçu. Le meilleur repli consiste à garder Publier et
+le verdict, et à ranger les trois autres exports derrière un bouton unique, l'export secondaire
+étant un geste rare que la palette `⌘K` sait déjà déclencher puisque la liste des commandes est
+construite L436 à L459.
+
+---
+
+## Les huit conteneurs de mise en page
+
+Rappel du modèle tel que je l'ai lu, parce que tout le tableau qui suit en dépend. Une composition
+vaut des lignes, chaque ligne vaut des items, et la profondeur s'arrête là ; le rendu double
+exactement cette boucle (`compile.js` L209 et L210), la ligne devient une grille
+`repeat(auto-fit, minmax(min(100%,220px),1fr))` (L246 du CSS produit, écrit dans `compile.js`) et
+chaque item reçoit `min-width:0; overflow:hidden`. Un item ne peut donc pas contenir d'item, et
+`PLACEMENTS` ne connaît pas `inside`.
+
+Une nuance qui vaut d'être posée avant le tableau : entre le modèle plat d'aujourd'hui et l'arbre
+de C7, il existe un palier intermédiaire bon marché, qui consiste à donner à la LIGNE des
+propriétés de disposition, colonnes, gouttière, alignement, sans rien imbriquer. Ce palier suffit à
+trois des huit conteneurs. Je le présente comme une proposition, non comme une décision.
+
+| Conteneur UMG | Équivalent HTML/CSS exact | Réalisable aujourd'hui ? |
+|---|---|---|
+| **StackBox** | `display:flex; flex-direction: row \| column; gap` | Partiellement. Une ligne EST déjà une boîte horizontale, et l'empilement de lignes une boîte verticale. Ce qui manque est l'imbrication d'une boîte dans une boîte, donc C7. |
+| **UniformGrid** | `display:grid; grid-template-columns: repeat(N, 1fr); grid-auto-rows: 1fr` | Oui, au palier intermédiaire. La ligne est déjà une grille ; passer d'`auto-fit` à un nombre de colonnes déclaré est une propriété de ligne, sans C7. |
+| **Grid** | `display:grid` avec `grid-column`/`grid-row` explicites et `span` | Non. Un placement en colonne et en rangée nommées suppose que les enfants soient des enfants, donc C7. |
+| **SizeBox** | `width`, `height`, `min-*`, `max-*`, `aspect-ratio` sur l'enveloppe | Partiellement, et dès C1. Appliqué à un item existant, c'est une propriété écrite par `patchItem` ; en vrai conteneur qui enveloppe un enfant, c'est C7. |
+| **ScaleBox** | `transform: scale()` avec `transform-origin`, ou `zoom`, sur une enveloppe de taille fixe | Partiellement, mêmes conditions que SizeBox. Réserve à mesurer : une mise à l'échelle par `transform` ne change pas la hauteur mesurée par le Critique, qui lit le `scrollHeight` du document ; un ScaleBox pourrait donc masquer un débordement au lieu de le résoudre. |
+| **ScrollBox** | `overflow: auto` avec une hauteur bornée | Techniquement oui sur un item, mais douteux au fond. Un média exporté en PNG ou en PDF n'a pas de barre de défilement, et le chemin `foreignObject` décrit dans `04-sortie.md` ne rendrait que la portion visible. À réserver au format article web, et je pose cela comme une hypothèse à vérifier par un export réel. |
+| **Overlay** | superposition par `grid-area: 1 / 1` sur une grille à une cellule, ou `position:absolute; inset:0` | Non, doublement. Il faut l'imbrication de C7 et il faut lever l'`overflow:hidden` posé sur `.zrm-lego-item` par `compile.js`, qui rogne aujourd'hui tout ce qui dépasse. |
+| **Canvas** | conteneur `position:relative` et enfants `position:absolute` avec ancres et décalages | Non, et c'est le plus lourd des huit. Il exige C7, une cinquième valeur `inside` dans `PLACEMENTS`, un modèle d'ancre à deux axes, et surtout un geste de manipulation qui n'existe nulle part dans l'application. |
+
+Deux conséquences se tirent de ce tableau. La première est que la carte C7 du tableau, dont le
+critère de fini est « je superpose deux pièces dans un Overlay et je les décale », désigne
+exactement les deux conteneurs les plus coûteux, Overlay et Canvas, et qu'elle vaut donc bien la
+place qu'elle occupe, la dernière. La seconde est que trois conteneurs sur huit, UniformGrid,
+SizeBox et ScaleBox, sont atteignables avant C7, l'un par une propriété de ligne, les deux autres
+par le panneau de détails de C1 ; il y a donc de la valeur livrable avant la grosse carte.
+
+---
+
+## Ce que cette architecture promet de ne pas casser
+
+Trois engagements, écrits pour être vérifiables plutôt que rassurants.
+
+Le geste des quatre côtés survit sans être réécrit : `placementAt` reste l'unique calculateur de
+placement, l'aperçu l'appelle au lieu d'en recoder un second, et les quatre valeurs de `PLACEMENTS`
+gardent la sémantique que j'ai lue dans `insertItem`, où `left` et `right` insèrent dans la ligne
+et `above` et `below` créent une ligne.
+
+Les deux échelles ne se mélangent pas : le zoom manuel de la zone 2 n'écrit que dans `fitScale`,
+jamais dans `contentScale`, sous peine de fausser les mesures du Critique, avertissement déjà porté
+en commentaire `MediaApp.jsx` L107 à L111.
+
+Les couleurs sortent du dur au lieu d'y entrer : l'état actuel est en dette, le bleu `#0a84ff`
+revenant une quinzaine de fois dans `media.css` et aucun fichier de `src/zenraymedia/` n'important
+`src/config/colors.js`, dont l'en-tête pose pourtant qu'une couleur en dur ailleurs est un bug.
+Toute zone touchée par ce plan lit `UI.blue` plutôt que d'ajouter une seizième occurrence, et le
+bleu du repère de dépôt est le premier candidat, puisqu'il est justement la couleur de l'acquis à
+préserver.
