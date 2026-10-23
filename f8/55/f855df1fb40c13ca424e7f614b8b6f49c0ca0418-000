@@ -1,0 +1,12 @@
+# T-04-7-7 — Mise à jour & saison
+
+Calibrage (référence du catalogue) : Hollow Knight: Silksong
+
+## Sources
+- GUID (gameuidatabase.com) : Hollow Knight: Silksong — 20 images (tranche non utilisée par T-04-1-7, sur 44 thumbs totaux dont 24 déjà consommés)
+- IIG (interfaceingame.com) : Hollow Knight 1 (Silksong absent, substitution déjà appliquée en T-04-1-7) — 9 images (tranche non utilisée, sur 33 images totales dont 24 déjà consommées)
+- OFFICIAL : Steam (appid 1030300) — 2 images (tranche non utilisée, seulement 10 hash de captures existent au total sur Steam, dont 8 déjà consommés par T-04-1-7)
+
+Total : 31/56
+
+Substitution : ce jeu est déjà calibrage de T-04-1-7 (annonce surprise). Toutes les sources sont proches ou en dessous de l'épuisement total (GUID 44 dispo, IIG 33 dispo, OFFICIAL 10 dispo) — chaque source a été vérifiée par hash pour ne réutiliser AUCUNE image déjà servie dans T-04-1-7 (`comm -12` = 0 sur les trois sources). Shortfall massif sur OFFICIAL (2/8) assumé : le stock Steam total est épuisé aux 4/5, pas de solution de contournement légitime sans dupliquer.
