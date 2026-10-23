@@ -1,0 +1,292 @@
+# ZenRayMedia — le tableau unique
+
+Réécrit le 2026-08-04, après cinq jours sans version livrable, 143 601 lignes de spécification dans
+419 fichiers pour 12 190 lignes de code, et 1024 thèmes décrits dont sept existent.
+
+**Ce fichier est désormais la seule page vivante de `docs/zenraymedia/`.** Tout le reste est de
+l'archive en lecture. Une décision qui n'est pas écrite ici n'existe pas.
+
+---
+
+## La vision, dans les mots de Matthieu, à ne plus jamais reformuler
+
+> **La vision a une page à elle depuis le 2026-08-05 : `docs/zenraymedia/VISION.md`.** Elle y réunit
+> les visions successives, verbatim, la plus récente incluse (galerie de publication au croisement de
+> six logiciels, plus les pistes reportées). Ce qui suit est la vision I, celle qui a porté les cartes
+> L1 à F6 ; elle reste ici parce que c'est le brief opératoire de ce tableau, mais toute vision
+> nouvelle s'écrit désormais dans `VISION.md`, jamais ici.
+
+> « L'éditeur de Unreal UMG qui peut déployer des médias en layer de HTML pour craft rapidement un
+> media comme Photoshop le fait déjà. Pense éditeur d'UI comme React mais en GUI + layer HTML comme
+> Photoshop = layer de PNG ou effets. »
+
+Elle était déjà écrite en bas de la version précédente de ce tableau, en une ligne qu'on a laissée
+passer : « la visée est un Photoshop hyper rapide ». Cinq jours ont été dépensés à ne pas la lire.
+
+**L'INTERFACE est celle d'UMG.** Palette, hiérarchie, canevas, détails, barre d'état, en huit zones.
+Elle est construite depuis le 2026-08-04.
+
+**LE MODÈLE est celui de Photoshop.** Une pile ordonnée de calques posés sur un canevas de taille
+fixe. Photoshop n'imbrique pas, il empile, et c'est précisément ce qui rend la composition rapide.
+Chaque calque porte sa position, sa taille, son rang, son opacité, son mode de fusion, ses effets.
+
+**LA SORTIE est du HTML aplati.** Les calques s'écrivent en positionnement absolu dans une page
+autonome, comme Photoshop aplatit ses calques en une image.
+
+Ce que cette phrase ÉCARTE, et qui compte autant que ce qu'elle demande. Il ne s'agit pas d'un
+générateur d'articles à partir d'un brief, lequel était déjà fait et n'était pas demandé. Il ne
+s'agit pas non plus d'un arbre de widgets imbriqués avec emplacements, lequel coûte des semaines
+pour un gain nul sur « craft rapidement ». La carte C7 de l'ancien tableau, les conteneurs de mise
+en page, est donc annulée et non reportée.
+
+---
+
+## La règle qui manquait, et qui explique les cinq jours
+
+Aucune carte n'était jamais **validée**. On passait d'un article à des composants, puis à des
+thèmes, sans qu'aucune pièce ne soit déclarée finie par Matthieu. Désormais :
+
+1. Une carte se prend **une à la fois**, dans l'ordre du tableau, jamais deux en parallèle.
+2. Une carte a **une porte** : une commande qui rend vert, jamais une impression.
+3. Une carte n'est **VALIDÉE** que lorsque Matthieu l'a vue à l'écran et l'a dit.
+4. Tant qu'une carte n'est pas validée, **aucune ligne** n'est écrite sur la suivante.
+5. Aucune ligne de documentation n'est écrite ailleurs que dans ce fichier.
+
+---
+
+## Le tableau
+
+Statuts : `à faire` · `en cours` · `porte verte` · `VALIDÉ`
+
+| # | Carte | Porte | Statut |
+|---|---|---|---|
+| L1 | Modèle de calques | `npx vitest run src/zenraymedia/layers.test.js` vert | porte verte |
+| L2 | Compilation des calques en HTML absolu | un calque à x=120 produit un HTML contenant `left:120px` | porte verte |
+| L3 | Palette de calques : Texte, Image, Forme, Composant | les quatre types se posent sur le canevas | porte verte |
+| L4 | Hiérarchie en pile, haut = premier plan | monter un calque le fait passer devant, testé | porte verte |
+| L5 | Détails du calque : géométrie, opacité, fusion, effets | changer l'opacité change le HTML produit | porte verte |
+| L6 | Canevas manipulable : glisser et redimensionner | déplacer un calque à la souris change ses x/y dans le modèle | porte verte |
+| L9 | Sous-composants : arbre du DOM, clic pour sélectionner, réglages à droite | `npx vitest run src/zenraymedia/nodes.test.js` vert | porte verte |
+| L10 | Hygiène d'affichage : aucun bouton ne prend la place d'un autre | aucune superposition à 616 px de large | porte verte |
+| L11 | Plan de travail mobile : molette, zoom, main | ⌘+molette zoome, espace+glisser déplace | porte verte |
+| L7 | Annulation et rétablissement | dix gestes, dix annulations, l'état revient à l'octet près | à faire |
+| L8 | Export aplati, HTML autonome et PNG | le fichier produit contient les calques positionnés | à faire |
+
+### L1 · Modèle de calques
+
+Un calque : `{ id, kind, name, x, y, w, h, z, opacity, blend, hidden, locked, source, effects }`.
+`kind` vaut `text`, `image`, `shape` ou `component`. Les coordonnées sont en pixels du canevas, donc
+indépendantes du zoom d'affichage, exactement comme le sont déjà les mesures du Critique.
+
+**Le contrat n'a pas besoin d'être rouvert**, et c'est le cadeau de la carte C1 du 2026-08-01 :
+depuis cette date `normalizeComposition` conserve les clefs qu'elle ne connaît pas, si bien qu'un
+tableau `layers` posé à côté de `rows` survit à tous les gestes sans qu'une ligne de son contrat
+change. Les documents déjà enregistrés restent lisibles, puisqu'un document sans calques rend un
+tableau vide.
+
+### L2 · Compilation
+
+Les calques s'écrivent dans un conteneur `position:relative` aux dimensions du format, chacun en
+`position:absolute`. L'ordre du DOM suit le rang, si bien que le rang le plus élevé se dessine en
+dernier, donc devant. La voie article n'est pas touchée : un document sans calques compile
+exactement comme aujourd'hui.
+
+### L6 · Canevas manipulable
+
+Les poignées vivent dans une couche superposée à l'aperçu, HORS de l'iframe, ce qui évite d'injecter
+du script dans un document destiné à l'export. Le pont de sélection posé le 2026-08-01 sert de
+précédent : le document ne remonte qu'un identifiant, le parent décide.
+
+### L3 à L5, L7, L8
+
+Détaillées au moment de les prendre, jamais avant. Une carte spécifiée trois jours à l'avance est
+une carte spécifiée deux fois.
+
+---
+
+## Ce qui reste acquis et qu'aucune carte n'a le droit de casser
+
+L'édition d'un composant depuis ses quatre côtés, seul acquis que Matthieu ait nommé. Les sept
+formats et leurs zones de sécurité. La compilation déterministe, octet pour octet à graine égale.
+Les exports HTML, PNG et PDF avec polices embarquées. La persistance `.zmedia.json` dans Create.
+Le Critique et ses mesures de contraste. Les huit zones de l'interface.
+
+## Ce qui n'est PAS sur le tableau, et pourquoi
+
+**Pas d'imbrication.** Les huit conteneurs d'UMG sortent du produit. Photoshop n'imbrique pas, et
+c'est délibéré chez lui comme ici.
+
+**Pas de timeline.** `cut.js` est déjà la partition temporelle du produit. La bande d'animation
+montre la durée, elle ne la pilote pas.
+
+**Pas de nouveau thème** tant que L8 n'est pas validée. Les sept existants suffisent à prouver la
+chaîne, et en reproduire trois cents avant que la chaîne tienne est ce qui a déjà coûté deux jours.
+
+---
+
+## Famille Slate (Unreal Editor), demandée le 2026-08-04
+
+Matthieu a fourni une carte des huit familles fonctionnelles de Slate (l'UI d'Unreal Editor) et
+demandé de les reprendre séquentiellement, une à la fois, chacune codée puis vérifiée avant la
+suivante. Ordre imposé par lui, repris tel quel.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| S1 | Sélection, inspection, propriétés | porte verte | Verrou du panneau de détails sur un objet ; édition groupée à valeurs mixtes sur une sélection multiple de calques. |
+| S2 | Viewports, manipulation directe | porte verte | Rotation (poignée dédiée) ; magnétisme sur les bords/centres du canevas et des autres calques ; cadrage de la sélection (Maj+F). |
+| S3 | Docking, panneaux, onglets | porte verte | Colonnes redimensionnables au glisser, deux poignées. |
+| S4 | Menus, commandes, raccourcis | porte verte | Menu contextuel (clic droit) sur la hiérarchie. |
+| S5 | Assets, recherche, filtres | à faire | La recherche et les onglets par type existent déjà (Comp./Thèmes/Img/Icô.) ; pas de gain net identifié qui ne soit pas déjà couvert. |
+| S6 | Collections, listes, tableaux | à faire | L'arbre, le multi-select et le tri par rang existent déjà ; un tri par colonne n'a pas de valeur réelle à l'échelle d'un document ZenRayMedia (quelques dizaines de pièces, pas des milliers d'acteurs). |
+| S7 | Graphes nodaux | écarté | Aucun concept de flux de données à connecter dans ZenRayMedia. Un éditeur de nœuds décoratif violerait la règle « réellement fonctionnelle ». |
+| S8 | Focus, glisser-déposer, feedback | porte verte | Navigation clavier (flèches) dans la hiérarchie, dans l'ordre visible. Le glisser-déposer et les toasts existaient déjà. |
+
+**Deux bogues réels trouvés en écrivant les tests de vérification, ni l'un ni l'autre deviné :**
+le magnétisme collait tout calque au bord gauche sans jamais le relâcher (comparaison `0` à `0`,
+toujours vraie) ; l'effet des raccourcis clavier avait un tableau de dépendances vide depuis sa
+création, rendant Maj+F muet et Échap incapable de fermer le futur menu contextuel. Les deux sont
+corrigés avant tout commit — c'est exactement la discipline qu'impose la règle du tableau.
+
+## Famille Photoshop, demandée le 2026-08-04 (même journée, seconde liste)
+
+Après la famille Slate, Matthieu a fourni une seconde carte, cette fois calquée sur les huit
+familles fonctionnelles de Photoshop orientées composition graphique. Même discipline reprise à
+l'identique : une famille à la fois, codée puis vérifiée avant la suivante.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| P1 | Sélection et ciblage | porte verte | Sélection rectangulaire (marquee) sur le canevas, réinterprétée en sélection de CALQUES puisque le produit n'a pas de pixels à isoler. Tout sélectionner (⌘A), Inverser (⌘⇧I). |
+| P2 | Déplacement, alignement, transformation | porte verte | Alignement et distribution d'une sélection multiple (sur leur boîte englobante commune, jamais le canevas). Retournement horizontal/vertical, deux interrupteurs. |
+| P3 | Texte et typographie | déjà couvert | LAYER_STYLES (carte S2) couvre déjà le noyau retenu par la doc : police, corps, graisse, italique, couleur, alignement, interlettre, interligne. Rien ajouté. |
+| P4 | Formes vectorielles | porte verte | Type de forme (rectangle/ellipse/ligne) ; le remplissage et le contour existaient déjà. |
+| P5 | Calques, groupes, empilement | porte verte | Groupes : dossier repliable, masquage/verrou collectifs, contiguïté forcée dans la pile. Le déplacement collectif au canevas n'est pas fait, assumé par écrit. |
+| P6 | Importation, placement, recadrage | porte verte | Point focal d'une image dans son cadre (object-position), sans construire un outil de recadrage séparé. |
+| P7 | Apparence, opacité, fusion, styles | déjà couvert | Opacité, douze modes de fusion, quatre filtres, ombre (carte S2) couvrent le noyau. Les calques de réglage qui affectent les calques du dessous sont écartés : demanderaient du backdrop-filter fragile pour un gain marginal sur les filtres déjà par-calque. |
+| P8 | Édition fondamentale et historique | porte verte | Annuler/Rétablir (borné à 50 états, `patchComposition` comme point d'entrée unique). Copier/Couper/Coller de calques, presse-papiers interne. |
+
+**Deux bogues réels trouvés en écrivant les tests, aucun deviné :** `event.button` est perdu par
+jsdom sur un `PointerEvent` synthétisé (même famille de limite que `clientX`, déjà rencontrée
+carte S3) — traité comme le bouton primaire, sans rien changer en navigateur réel. Et
+`couperSelection` appelait `surLaSelection` sans repli sur `selectedComponent`, si bien que Cmd+X
+ne retirait rien dans le cas le plus courant, un calque unique tout juste posé.
+
+## Famille Figma, demandée le 2026-08-04 (même journée, troisième liste)
+
+Troisième carte, cette fois calquée sur les huit familles fonctionnelles de Figma Design. Matthieu
+a posé une condition d'ouverture explicite : ne commencer Figma qu'une fois Slate ET Photoshop
+arrivés à 8/8 chacun — condition remplie avant la première ligne de code de cette section. Même
+discipline reprise à l'identique : une famille à la fois, codée puis vérifiée avant la suivante.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| F1 | Sélection et manipulation directe | déjà couvert | Sélection simple/multiple, poignées de redimensionnement, marquee (carte P1), déplacement au clavier et à la souris : tout existait avant même l'ouverture de cette liste. Rien ajouté. |
+| F2 | Calques, hiérarchie, ordre d'empilement | déjà couvert | Arbre de calques, groupes repliables (carte P5), montée/descente de rang : même noyau que Figma, déjà en place. Rien ajouté. |
+| F3 | Frames, groupes, sections, contraintes | porte verte | Contraintes de redimensionnement (gauche/centre/droite/échelle, par axe) : un calque réagit au changement de FORMAT du document, seul redimensionnement de cadre que connaisse ce produit. |
+| F4 | Auto Layout | porte verte | Un groupe peut devenir un flux (ligne ou colonne, écart réglable) ancré à son coin d'origine, recalculé après CHAQUE mutation de la composition — agrandir un membre repousse réellement ses voisins, sans geste manuel. Portée assumée par écrit : pas de Hug/Fill/Fixed par axe du conteneur lui-même, un groupe n'a toujours pas de géométrie propre (carte P5), seulement une ancre. |
+| F5 | Création et édition de texte | porte verte | Double-clic sur un calque texte : édition EN PLACE, directement sur le canevas, au lieu du seul aller-retour par le panneau Détails. Le contenu reste un champ UNIQUE (`source`), partagé entre les deux entrées. La typographie complète (police, corps, graisse, alignement…) était déjà couverte par LAYER_STYLES (carte S2) : rien ajouté là. |
+| F6 | Formes vectorielles | porte verte | Polygone et étoile, les deux formes PARAMÉTRIQUES de Figma (nombre de côtés, ratio de rayon interne pour l'étoile), rendues en `clip-path` réel — s'ajoutent à rectangle/ellipse/ligne (carte P4). L'outil Plume et l'édition de points de courbe individuels sont explicitement hors périmètre, écrit au-dessus de `SHAPE_TYPES` dans `layers.js` : un second modèle de géométrie à points de contrôle pour un usage (poster/carrousel) que ce produit ne rencontre pas. |
+| F7 | Apparence (fills, contours, effets, images) | porte verte | Remplissage DÉGRADÉ (`fillType: solid\|gradient`, deux couleurs, angle 0-359, rendu en `linear-gradient` réel). Opacité, douze modes de fusion, quatre filtres et ombre portée (carte S2) couvraient déjà le reste. Portée assumée : Figma empile plusieurs fills indépendants par calque (solide + dégradé + image, chacun avec sa propre opacité), ce produit n'en garde qu'UN À LA FOIS — l'empilement sert des compositions que l'usage réel d'aujourd'hui (affiches Instagram/LinkedIn, VISION.md) ne rencontre pas encore. |
+| F8 | Composants, instances, variantes | porte verte | **Bogue réel corrigé, pas une fonctionnalité neuve** : un calque de type composant EST une instance au sens de Figma (même pièce HTML partagée du thème, réglable localement) depuis la carte L3, mais `reglerChemin`/`reglagePour`/`reglageCourant` ne cherchaient JAMAIS que dans les pièces Lego classiques (`rows[].items[]`) — éditer le texte d'un sous-composant de calque semblait fonctionner (le champ apparaissait, pré-rempli) et n'écrivait NULLE PART. Corrigé en étendant ces trois fonctions aux calques (`findLayer`/`patchLayer`). Ajout : un bouton « Déplier les sous-composants » sur les calques composants dans la hiérarchie, identique à celui des pièces Lego. Le swap d'instance (changer le composant référencé) existait déjà via le sélecteur `source`. Portée assumée, hors périmètre : le DÉTACHEMENT d'instance (convertir un calque composant en calques primitifs indépendants) rouvrirait le modèle sur une structure HTML arbitraire qui ne correspond à aucun des quatre types de calque fixes — un détachement imparfait produirait un résultat cassé, pire que l'absence de la fonction. Les VARIANTES nommées (jeux de composants regroupés, ex. État=Défaut/Survol) n'ont pas d'équivalent dans la bibliothèque de composants de thème actuelle et sortiraient du 80/20 pour l'usage réel (affiches, pas maquettes d'interface à états). |
+
+**Un bogue réel trouvé en écrivant les tests, non deviné :** `readGroups` ne laissait passer que
+quatre champs (`id`, `name`, `hidden`, `locked`) et effaçait silencieusement `autoLayout`/`autoX`/
+`autoY` à chaque relecture — `patchGroup` écrivait la donnée, la lecture suivante la perdait
+aussitôt. Corrigé en élargissant la normalisation, pas en contournant la relecture.
+
+## Famille PowerPoint, demandée le 2026-08-06 (troisième liste, après Figma 8/8)
+
+Quatrième carte, calquée sur les huit familles fonctionnelles de PowerPoint. Matthieu a autorisé
+l'enchaînement directement sur Miro une fois PowerPoint terminé, sans validation intermédiaire.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| P1 | Structure, diapositives, masques | porte verte | Une DIAPOSITIVE est un groupe dédié (carte P5), pas un second modèle de canevas : `project.compositions[themeId]` reste UNE composition, le contrat de C1 n'est pas rouvert. Ajouter/dupliquer/supprimer/réordonner une diapositive, navigation en cliquant son nom. Un calque SANS diapositive (libre, ou dans un groupe ordinaire) agit comme un MASQUE, visible sur toutes les diapositives — traduit en carrousel Instagram (VISION.md). Portée assumée : dispositions pré-remplies et sections regroupant plusieurs diapositives hors périmètre ; la vue Trieuse se limite à une liste, pas des vignettes visuelles rendues. |
+| P2 | Sélection, transformation, organisation | porte verte | Trois ajouts réels par-dessus S1/S2/P1/P2 (Photoshop) déjà en place : (1) aligner un calque UNIQUE sur le CANEVAS plutôt que sur lui-même (l'alignement mutuel exigeait déjà deux calques) ; (2) « Mettre au premier/arrière-plan », un saut direct à l'extrême, distinct du rang unique déjà câblé, rangé dans le menu contextuel comme le font PowerPoint/Figma/Miro ; (3) Maj conserve les proportions au redimensionnement dans un coin (`applyHandle` accepte un drapeau, faux par défaut, donc aucun appel existant n'est affecté). |
+| P3 | Texte et typographie | porte verte | Police/corps/graisse/casse/alignements (carte S2) et édition en place (carte F5) couvraient déjà le noyau. Deux ajouts réels : LISTE à puces ou numérotée (une ligne = un `<li>`, portée assumée : jamais de niveaux imbriqués) ; LIEN restreint aux protocoles sûrs (`safeHref` — http/https/mailto/relatif/ancre), un `javascript:` est REFUSÉ à l'écriture plutôt qu'assaini. |
+| P4 | Formes, images, icônes, médias | déjà couvert | Formes (P4/F6), remplissage/contour/effets (S2/F7), image + recadrage par point focal (P6) couvrent déjà le noyau. Icônes : un calque texte accepte déjà tout symbole Unicode/emoji, et polygone/étoile (F6) couvrent le besoin géométrique — pas de bibliothèque d'icônes dédiée construite pour ce seul gain marginal. Écarté et écrit : vidéo/audio (ZenRayProgress a déjà un pipeline HLS/DASH mature ailleurs, le dupliquer dans l'éditeur de calques ne sert pas l'usage réel d'affiches statiques de VISION.md) et suppression d'arrière-plan par IA (hors périmètre d'un compositeur HTML côté client). |
+| P5 | Tableaux, graphiques, SmartArt | porte verte (tableau) | CINQUIÈME TYPE DE CALQUE, le tableau : grille à plat (`tableCells[ligne*colonnes+col]`) bornée 1-8 par axe, redimensionner conserve le contenu déjà saisi (`resizeTableCells`, testé lignes ET colonnes, agrandir et rétrécir). Rendu en `<table>` réel. Graphiques et SmartArt explicitement ÉCARTÉS et écrits : l'un exigerait une bibliothèque de rendu de graphiques, l'autre un moteur de mise en page générative pour les diagrammes — chantiers disproportionnés pour l'usage réel d'affiches (VISION.md), et le tableau couvre déjà le cas fréquent (comparatif, conseils en colonnes) d'une donnée structurée dans une seule image. |
+| P6 | Transitions et animations | porte verte (entrée animée) | ENTRÉE ANIMÉE d'un calque (fondu/montée/zoom, délai réglable), active en aperçu INTERACTIF seulement — un export figé n'a pas d'« avant l'animation » à montrer. Posée sur un WRAPPER INTERNE, jamais sur la boîte du calque : celle-ci porte déjà sa rotation (`transformOf`), et un keyframe qui toucherait aussi `transform` l'aurait effacée à la fin de l'animation (vérifié par test). Transitions entre diapositives explicitement ÉCARTÉES et écrites : un carrousel Instagram change de panneau par un coup sec, jamais un fondu, et aucun mode « présentation » n'existe ici pour les jouer. |
+| P7 | Présentation, répétition, enregistrement | porte verte (navigation clavier) | Presque intégralement HORS PÉRIMÈTRE, et c'est écrit plutôt que deviné avec optimisme : pointeur laser, stylet, minuteur, Speaker Coach, enregistrement caméra/micro et vue Présentateur à deux écrans appartiennent à l'usage « parler devant un public », qu'aucune traduction ne rapproche d'un compositeur d'affiches (VISION.md). Seul geste retenu : Page suivante/précédente au clavier bascule la diapositive active, sans sortir des bornes — le seul besoin de navigation qui survit une fois l'usage réel posé. |
+| P8 | Collaboration, sauvegarde, diffusion | porte verte (export du carrousel) | Sauvegarde (`.zmedia.json`) et export HTML/PNG/PDF d'UNE image existaient déjà (`exporters.js`), jamais testés au clic dans ce fichier faute de canvas/Image en jsdom — limite antérieure à cette carte, pas créée par elle. Ajout réel : « Toutes les diapositives », qui recompile chaque diapositive avec elle seule active et exporte une image par fichier — la traduction directe d'un diaporama en carrousel Instagram/LinkedIn, n'apparaît qu'à partir de deux diapositives. COLLABORATION explicitement ÉCARTÉE et écrite : coédition temps réel, présence, permissions par rôle exigeraient une synchronisation serveur qu'aucune partie de ce dépôt ne porte, un chantier sans rapport avec un éditeur solo. |
+
+**Un bogue réel corrigé en écrivant les tests d'interface, non deviné :** `data-shape` s'écrivait
+DANS la valeur de l'attribut `class`, avant son propre guillemet fermant — `class="…shape
+data-shape="rectangle""`, une chaîne malformée dont chaque test antérieur (cartes P4, F6) ne
+vérifiait que la PRÉSENCE en sous-chaîne, ce qui reste vrai même malformé. Le sélecteur CSS
+`[data-shape="ellipse"]` (bordure ronde, ligne fine, clip-path polygone/étoile) ne matchait donc
+JAMAIS rien dans le DOM réellement analysé par un navigateur. Corrigé dans `compile.js`, vérifié
+par un test qui analyse le HTML avec un vrai parseur (`DOMParser`) plutôt qu'une sous-chaîne.
+
+## Famille Miro, demandée le 2026-08-06 (quatrième liste, après PowerPoint 8/8)
+
+Cinquième carte, calquée sur les huit familles fonctionnelles de Miro. Enchaînée directement après
+PowerPoint sur instruction de Matthieu, sans validation intermédiaire entre les deux.
+
+**Une différence de modèle prime sur tout le reste, et il faut la nommer avant le tableau.** Miro
+est un CANEVAS INFINI : on y pense l'espace sans bord, on zoome et déplace une fenêtre mobile sur un
+mur sans limite. ZenRayMedia compose un CANEVAS BORNÉ, la taille exacte d'un format de publication
+(1080×1080, A4…). Plusieurs familles Miro (navigation, minimap, frames comme sections d'un grand
+mur) supposent cette absence de bord ; leur traduction fidèle n'a pas de sens dans un format fixe,
+et forcer l'équivalence produirait une fonctionnalité qui a l'air de marcher sans rien apporter.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| M1 | Navigation dans le canevas | déjà couvert | Pan (barre d'espace + glisser), zoom, cadrage sur la sélection (Maj+F) et réinitialisation (F) existent déjà (carte S2). La minimap est écartée : elle sert à se repérer sur un mur sans bord, un canevas borné se voit déjà en entier. |
+| M2 | Sélection simple et multiple | déjà couvert | Sélection simple/multiple, marquee, lasso via rectangle (carte P1 Photoshop), filtre de sélection par type non retenu (bibliothèque de quatre/cinq types de calques, pas des centaines d'objets hétéroclites à trier). |
+| M3 | Déplacement, redimensionnement, rotation, duplication | déjà couvert | Poignées, rotation, retournement, duplication, guides intelligents (cartes L6/S2/P2 Photoshop), Maj conserve les proportions et Mettre au premier/arrière-plan (carte P2 PowerPoint). |
+| M4 | Création et édition de texte | déjà couvert | Police/corps/graisse/alignements (S2), édition en place sur le canevas (F5), listes et liens (P3 PowerPoint) couvrent le noyau que Miro documente pour le texte libre. |
+| M5 | Post-it, formes, cartes | porte verte (post-it) | Formes déjà couvertes (P4/F6). POST-IT : une PRÉSÉLECTION du calque texte (fond jaune, marge intérieure, texte centré, ombre légère), posée en un clic — aucun type de calque neuf, le fond reste ensuite un réglage de couleur ordinaire, modifiable comme n'importe quel calque. CARTES (titre/description/assigné/statut/dates) écartées : structure de suivi de tâches sans rapport avec une affiche de publication. |
+| M6 | Connecteurs, lignes et flèches | porte verte | GENRE NEUF DE CALQUE `shape` (aucun type ajouté à `LAYER_KINDS`) : un connecteur porte `connectFrom`/`connectTo`, deux identifiants de calques, et sa géométrie (boîte englobante des CENTRES + deux points relatifs) se RECALCULE après chaque mutation (`applyConnectors`, même principe que l'Auto Layout F4) — un déplacement de l'un des deux calques fait réellement suivre la ligne, vérifié par test. Rendu en `<svg><line>` interne plutôt qu'en rotation CSS : pivoter au centre (convention déjà posée, carte S2) aurait déplacé la ligne loin de son point de départ. Geste : sélectionner EXACTEMENT deux calques puis « Relier par un connecteur », plutôt que le survol à points bleus de Miro (aurait exigé un système de détection au survol entier pour un gain marginal). Un bout supprimé fige le connecteur à sa dernière position (la relecture invalide la référence morte), jamais une erreur. |
+| M7 | Structuration : ordre, groupes, alignement, frames, verrous | déjà couvert | Ordre (`reorderLayer` + `bringToFront`/`sendToBack`, carte P2 PowerPoint), groupement (P5 Photoshop), alignement mutuel ET sur canevas (P2 Photoshop/PowerPoint), verrouillage (`layer.locked`, P5) couvrent tout le noyau. FRAMES écartées et écrites : un frame Miro est un groupe qui possède en plus sa PROPRE géométrie visible (bordure, titre, fond) — donner une géométrie aux groupes rouvrirait un modèle volontairement laissé sans géométrie propre depuis la carte P5, et re-refusé à la carte F4 (Auto Layout) pour la même raison. La différence groupe/frame reste purement visuelle, non retenue pour ce seul gain. |
+| M8 | Collaboration, présence, permissions | hors périmètre (écrit) | Coédition en temps réel, curseurs de présence, suivi d'un collaborateur, permissions par rôle (view/comment/edit) : tous exigeraient une synchronisation serveur qu'aucune partie de ce dépôt ne porte — exactement l'exclusion déjà posée pour PowerPoint P8, pour la même raison. ZenRayMedia reste un éditeur solo ; en faire un outil multi-utilisateur serait un chantier d'infrastructure sans rapport avec la vision actuelle (VISION.md). |
+
+## Famille Illustrator, demandée le 2026-08-06 (cinquième liste, après Miro 8/8)
+
+Sixième carte, calquée sur les huit familles fonctionnelles d'Illustrator. Matthieu a nommé
+InDesign comme SEPTIÈME logiciel à venir après celle-ci (signet posé dans `VISION.md`, aucune
+famille encore dictée). Numérotation `I1` à `I8`, la lettre P étant déjà partagée par Photoshop et
+PowerPoint.
+
+**Point d'attention explicite de Matthieu, vérifié avant tout code :** craignait que l'outil Plume
+(tracé vectoriel par points d'ancrage) soit manquant. Vérifié PLUTÔT QUE SUPPOSÉ : il l'est
+réellement — la carte F6 (Figma, formes vectorielles) avait explicitement écarté « l'outil Plume et
+l'édition de points de courbe individuels », écrit noir sur blanc à l'époque comme hors périmètre.
+Ce report arrive maintenant à échéance : Illustrator EST l'outil vectoriel par définition, la Plume
+en est le cœur documenté (famille I2), elle ne peut plus rester hors périmètre ici.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| I1 | Sélection et édition directe des objets | déjà couvert | Sélection simple/multiple, marquee, cadrage (cartes P1 Photoshop/S2) couvrent le noyau. La sélection de POINTS D'ANCRAGE arrive avec la carte I2 (Plume), qui est l'endroit réel où elle prend son sens. « Sélection de groupe » et mode Isolation SANS OBJET ici : le modèle de groupe de ce produit est PLAT (carte P5) — un membre reste toujours directement cliquable, sans jamais avoir besoin d'un mode spécial pour l'atteindre à travers une boîte de groupe fermée, différence structurelle qui rend la question sans objet plutôt que non résolue. Lasso et Baguette magique écartés par écrit : un canevas de quelques dizaines de calques (pas des centaines d'objets hétéroclites) rend le rectangle de sélection déjà suffisant, et une sélection par propriété partagée resterait un gain marginal face au coût du tri qu'elle exigerait. |
+| I2 | Création et modification de tracés vectoriels (l'outil Plume) | codé et vérifié | La crainte de Matthieu était fondée : vérifiée avant tout code, la Plume manquait réellement (F6 l'avait explicitement écartée). Modèle : un point de tracé porte une ancre `x,y` et deux poignées indépendantes `inX/inY`, `outX/outY`, stockées en POURCENTAGE de la boîte du calque (comme un connecteur dépend d'AUTRES calques, un tracé ne dépend QUE de sa propre boîte : le redimensionner l'étire tout seul, zéro recalcul). Clic = point d'angle (poignées confondues avec l'ancre) ; clic-glissé = point lisse (poignées en miroir, mesurées depuis le glisser). Fermer près du premier point (au moins deux déjà posés) ferme le tracé ; Entrée le termine ouvert ; Échap annule le point en cours sans quitter l'outil, un second Échap quitte. Un tracé sélectionné expose directement ses ancres et, pour le point choisi, ses poignées — pas un second outil séparé, ce qui est la Sélection directe d'Illustrator vue comme un simple état d'affichage : glisser une ancre déplace tout le point, glisser une poignée sculpte un seul côté, Suppr sur un point sélectionné retire CE point (jamais le calque), double-clic une ancre convertit angle ↔ lisse, double-clic le tracé lui-même insère un point EXACTEMENT sur la courbe (recherche du plus proche échantillon bézier, pas le point brut du clic). Rendu en `<svg><path>` avec fond et contour peints SUR le tracé (jamais un `background-color` rectangulaire, qui déborderait de la silhouette). Panneau Détails : couleur et épaisseur de contour, bascule ouvert/fermé. Écarté par construction, aucune demande explicite : l'outil Crayon à main levée (dessin freehand) et la simplification algorithmique d'un tracé existant, deux fonctionnalités distinctes de la Plume dans la doc Illustrator, jamais mentionnées comme manquantes par Matthieu. Bogue réel trouvé ET corrigé en écrivant les tests d'interface : le point suivant un clic SANS glisser lisait par erreur la distance depuis le DERNIER APERÇU affiché (donc depuis le point précédent, jamais depuis son propre geste), ce qui aurait rendu presque tout point « lisse » par accident ; corrigé en portant le delta du glisser sur la référence du geste lui-même, jamais sur l'aperçu. Un second bogue, dans un TEST et non dans le produit, a été trouvé et corrigé au passage : une assertion plus ancienne (carte Photoshop 5, groupes) vérifiait l'absence de `data-shape` après avoir masqué un groupe, mais ce mot est AUSSI le nom d'un sélecteur CSS statique toujours présent dans la feuille de style — l'assertion ne passait que par course avec le debounce d'aperçu (220 ms), jamais pour la bonne raison ; corrigée pour vérifier l'absence réelle de tout calque rendu (`data-zrm-layer`). |
+| I3 | Transformation, alignement, arrangement | déjà couvert | Vérifié dans le code, pas supposé : `alignPatch` (aligner sur les autres calques ou, depuis la carte PowerPoint 2, sur le canevas), `distributePatch` (distribution égale), `bringToFront`/`sendToBack` (premier/arrière-plan en un saut, PowerPoint 2), `flipX`/`flipY` (miroir horizontal/vertical, `scale(-1,1)` CSS, Photoshop 2), et le panneau Détails porte déjà la position, la taille et la rotation en saisie numérique directe (cartes L6/S2). `duplicateLayer` décale déjà le doublon de 10 px (l'équivalent de « dupliquer avec décalage »). Écarté par construction, absent du code et jamais demandé : l'inclinaison/cisaillement (Shear) et la réflexion selon un axe arbitraire tracé à la main, deux transformations distinctes du retournement simple ; à la différence de la Plume (I2), rien n'indique que Matthieu les attende, donc rien n'est ajouté sans demande explicite plutôt que par supposition. |
+| I4 | Fond, contour, couleur, dégradé, apparence | déjà couvert | Vérifié dans le code : fond uni (`backgroundColor`) et dégradé (`fillType`/`gradientFrom`/`gradientTo`/`gradientAngle`, Figma F7) ; contour via le champ libre `border` de `LAYER_STYLES` (ex. `1px solid #000`, couleur et épaisseur dans la même valeur CSS) ; opacité et onze modes de fusion (`BLEND_MODES`) dans la section Apparence. Le tracé Plume (I2) porte en plus son propre contour dédié (couleur/épaisseur séparées), puisque son fond et son contour se peignent sur le `<path>` SVG et non via ces mêmes champs CSS. Écarté par construction, avec une décision DÉJÀ écrite avant cette liste (commentaire de `FILL_TYPES`, carte Figma F7) : un fond unique à la fois par calque, jamais plusieurs fonds/contours empilés (le panneau Apparence réel d'Illustrator) — l'empilement sert des compositions bien plus complexes qu'une affiche 2D, seul usage réel aujourd'hui au sens de `VISION.md`. Écartés pour la même raison de disproportion, absents du code et jamais demandés : le nuancier de couleurs globales/nommées et la pipette (prélever une couleur affichée à l'écran). |
+| I5 | Texte | déjà couvert | Vérifié dans le code : police, corps, graisse, italique, interlettre, interligne, alignement et casse (`LAYER_STYLES`), listes à puces/numérotées et lien hypertexte protégé par `safeHref` (carte PowerPoint 3). Un calque texte est déjà, par construction, un texte de ZONE (une boîte qui enveloppe et coupe la ligne), l'équivalent du texte captif d'Illustrator — la distinction avec un texte au fil du point n'a pas d'objet séparé ici. Écartés par construction, absents du code et jamais demandés, deux fonctionnalités distinctes d'un simple réglage de police : le TEXTE SUR UN TRACÉ (attacher une ligne de texte à la courbe d'un tracé Plume, geste réel mais non réclamé par Matthieu) et la VECTORISATION DU TEXTE (convertir des lettres en tracés découpables point par point) — cette dernière demanderait d'extraire le contour propre à chaque police, un problème entièrement différent de tout ce que ce produit résout aujourd'hui, largement hors de portée d'un passage 80/20. |
+| I6 | Groupes, calques, empilement, masques | déjà couvert | Vérifié dans le code : groupes (`groupLayers`/`ungroupLayers`, modèle PLAT, carte P5), masquer/verrouiller par calque OU par groupe entier (`isEffectivelyHidden`/`isEffectivelyLocked`), empilement complet (`stackOrder`/`paintOrder`, premier/arrière-plan en un saut depuis PowerPoint 2). Un calque de forme se découpe déjà à sa PROPRE silhouette polygone/étoile (`shapeClipPath`, Figma F6). Écarté par construction, absent du code et jamais demandé, une fonctionnalité RÉELLEMENT distincte du découpage à soi-même : le MASQUE ÉCRÊTANT (Clipping Mask), où la forme du dessus découpe TOUT CE QUI EST EN DESSOUS plutôt qu'elle-même seule — geste courant d'Illustrator, mais jamais nommé par Matthieu, donc non ajouté par supposition, même logique que I3/I4/I5. |
+| I7 | Images liées/incorporées, vectorisation | codé et vérifié | Une image de calque était déjà, par construction, en voie LIÉE (une simple adresse `<img src>`, jamais recopiée) — le point focal de recadrage existait déjà (Photoshop 6). La voie INCORPORÉE, elle, manquait réellement à l'EXPORT : `embedImages()`, nouveau, incorpore chaque image en base64 dans le HTML de sortie, exactement comme `embedFonts()` le fait déjà pour les polices (même fichier `exporters.js`, même mise en cache par adresse, le type MIME venant de l'en-tête HTTP réel plutôt que deviné). Câblé dans les trois sorties existantes (HTML, PNG, PDF), JAMAIS dans l'aperçu ni l'édition, qui gardent la voie légère. Corrige au passage un échec RÉEL déjà documenté dans le message d'erreur d'`exportPng` : une image distante non incorporée peut faire échouer l'export en « teintant » le canvas. Écartée par construction, absente du code et jamais demandée, une fonctionnalité entièrement différente : la VECTORISATION (convertir une image bitmap en tracés Plume par détection de contours) — un problème de traitement d'image à part entière, sans rapport avec l'édition de calques que ce produit résout, largement hors de portée d'un passage 80/20. |
+| I8 | Plans de travail, canevas, export | déjà couvert | Un plan de travail Illustrator (plusieurs pages dans un même document) EST déjà la diapositive de la carte PowerPoint 1 : `readSlides`/`addSlide`/`removeSlide`/`reorderSlide`, un calque rejoint la diapositive active ou reste un masque partagé sur toutes. L'export de plusieurs plans de travail à la fois existe déjà (carte PowerPoint 8, « Toutes les diapositives »), et l'export lui-même vient de gagner l'incorporation d'images (I7) en plus des polices. Le canevas porte déjà règles (`.zrm-ruler`), magnétisme (`snapMove`) et zone de sécurité (`.zrm-safe-overlay`). Écartée par une différence D'ARCHITECTURE, pas par oubli : chaque plan de travail Illustrator peut avoir sa PROPRE taille, alors que le format (`format.canvas.w/h`) gouverne ici tout le document à la fois, un choix posé dès le début du produit (01-PLAN §6.1) et cohérent avec PowerPoint, où toutes les diapositives d'une même présentation partagent une seule taille — mélanger des tailles au sein d'un même document casserait ce modèle plutôt que de le compléter. |
+
+## Famille InDesign, demandée le 2026-08-06 (sixième liste, après Illustrator 8/8)
+
+Septième carte, calquée sur les huit familles fonctionnelles d'InDesign 21.5. Numérotation `D1` à
+`D8`, la lettre « I » naturelle d'InDesign étant déjà prise par Illustrator (comme P l'était déjà
+par Photoshop quand PowerPoint est arrivé). Même discipline que les six listes précédentes : huit
+familles maximum, une carte à la fois, jamais en parallèle, chaque sous-fonction vérifiée avant de
+passer à la suivante.
+
+| # | Famille | Statut | Ce qui a été fait |
+|---|---|---|---|
+| D1 | Structure du document, pages et pages parentes | codé et vérifié | Une PAGE ORDINAIRE d'InDesign EST déjà la diapositive (carte PowerPoint 1). Ce qui manquait réellement : la PAGE PARENTE, un gabarit NOMMÉ et RÉUTILISABLE que plusieurs diapositives peuvent appliquer à la fois (distinct du masque universel déjà existant, un calque sans diapositive). Modèle : `composition.parentPages` (groupe dédié + nom + `basedOnId` optionnel, chaîne d'héritage à la Racine, garde-fou anti-cycle), chaque diapositive porte `parentPageId` (`null` = `[Sans]`) et `masquerParent` (masque temporaire, sans désappliquer). Un calque posé SUR une page parente ne se peint JAMAIS comme un calque ordinaire (`isEffectivelyHidden` corrigé pour ce cas précis) : il n'existe qu'à travers `effectiveSlideLayers`, qui résout la chaîne complète, applique les remplacements locaux et peint TOUJOURS derrière (z synthétique négatif), exactement comme un gabarit InDesign reste sous ce qu'une page ajoute par-dessus. Contexte d'édition dédié (`activePageParentId`), mutuellement exclusif avec la diapositive active, pour poser et modifier les calques propres à un gabarit. Sur le canevas, un objet hérité s'affiche en pointillés, non draguable comme un calque normal : un clic ouvre son propre panneau, avec REMPLACEMENT LOCAL (position/taille/opacité/visibilité sur cette diapositive SEULEMENT, portée assumée par écrit — pas la totalité des attributs qu'un vrai calque porte, pour ne pas rouvrir tous les panneaux existants), DÉTACHEMENT complet et sans retour (devient un calque réel, figé à sa valeur actuelle), et RÉTABLISSEMENT (efface un remplacement). Supprimer une page parente ramène ses diapositives à `[Sans]` et répare les pages fondées sur elle. Bogue réel trouvé ET corrigé en écrivant les tests d'interface : changer de diapositive active OU entrer/quitter l'édition d'une page parente ne réinitialisait PAS la sélection de calque en cours, ce qui aurait affiché à tort le panneau d'un calque d'un autre contexte (potentiellement invisible) au lieu du panneau attendu — corrigé par un effet dédié. Un second effet, cette fois dans des TESTS déjà existants (PowerPoint P1/P7/P8) et non dans le produit : le nom d'une diapositive active apparaît désormais aussi dans son propre panneau Détails, en plus de sa ligne de hiérarchie — même ambiguïté que le dossier Calques homonyme déjà connue et déjà traitée par `getAllByText`, étendue partout où elle s'est propagée. |
+| D2 | Blocs, sélection, contenu, transformation, calques | codé et vérifié | Vérifié dans le code : sélection simple/multiple/marquee (Photoshop 1), déplacer/redimensionner/pivoter (L6/S2), alignement/répartition/empilement (I3), groupement/verrouillage/calques (Photoshop 5). Le seul écart réel avec la doc InDesign concernait une image : le bloc agit déjà comme un cadre de recadrage et choisit QUELLE partie reste visible (`focalX`/`focalY`, Photoshop 6), mais UNIQUEMENT via les curseurs du panneau Détails, jamais par un geste direct sur le canevas. Nouveau : le RÉCUPÉRATEUR DE CONTENU, un anneau fixe au CENTRE du cadre (jamais au point focal actuel, qui peut être ailleurs) — le glisser réécrit directement `focalX`/`focalY`, un troisième point d'entrée sur l'image en plus du bloc et de son contenu, sans changer d'outil, exactement le comportement documenté. Écartés par construction, absents du code et jamais demandés, même logique que le cisaillement déjà exclu en I3 : le POINT DE RÉFÉRENCE (une matrice 3×3 choisissant le pivot des transformations, alors que la rotation pivote ici TOUJOURS au centre, convention posée et testée depuis la carte S2) et le CISAILLEMENT — remettre en cause un pivot déjà câblé partout coûterait une reprise large pour un geste jamais réclamé. |
+| D3 | Texte, histoires, chaînage, texte en excès | codé et vérifié | Le vrai gap de cette famille : AUCUN chaînage n'existait entre blocs de texte, chaque calque texte était une île. Modèle choisi PAR ÉCRIT, plus étroit que la redistribution automatique réelle d'InDesign : chaque bloc garde son PROPRE contenu (`source`) ; le chaînage (`threadNextId`/`threadPrevId`, double lien comme une liste chaînée) est une relation STRUCTURELLE et visuelle, jamais un texte unique redécoupé automatiquement entre les blocs — la redistribution intelligente ajouterait ou retirerait des PAGES toute seule, hors périmètre écrit plus bas. Chaîner reroute plutôt que d'échouer si un bout est déjà lié (comportement réel InDesign), refuse les cycles. Ports d'entrée/sortie détachés HORS de la boîte (les huit poignées de redimensionnement occupent déjà chaque bord) ; cliquer le port de sortie charge un curseur de chaînage, cliquer un autre bloc texte complète le lien, Échap ou un clic sur le vide annule. « Afficher les liaisons » dessine des lignes en direct entre blocs chaînés (même géométrie que les connecteurs Miro 6, purement visuelle, aucun calque créé). LE TEXTE EN EXCÈS est mesuré RÉELLEMENT dans l'aperçu rendu (`scrollHeight` contre `clientHeight`, même geste que le Critique pour la page entière, carte L11), jamais deviné par un calcul de caractères par ligne : un point rouge sur le port de sortie signale un bloc qui déborde et n'a personne à qui le passer. Marges intérieures et justification verticale existaient déjà (`padding`/`justifyContent`, `LAYER_STYLES`). Écartés par écrit, absents du code et disproportionnés pour une affiche 2D : la REDISTRIBUTION INTELLIGENTE (ajout/retrait automatique de pages), les COLONNES INTERNES à un seul bloc, et l'ÉDITEUR D'ARTICLES (une vue texte séparée, déjà servie ici par l'édition directe sur le calque, carte Figma 5). |
+| D4 | Typographie, composition, styles de texte | codé et vérifié | Chaque calque texte réglait déjà sa typographie (`LAYER_STYLES` : police, corps, graisse, italique, interlettre, interligne, alignement, casse, vertical), mais AUCUNE définition n'était PARTAGÉE — modifier la police d'un titre ne changeait jamais les neuf autres qui devaient rester identiques. Nouveau : un STYLE DE TEXTE NOMMÉ (`composition.textStyles`), l'équivalent du style de PARAGRAPHE d'InDesign (s'applique au calque entier, jamais à une plage de caractères DANS le texte — le style de CARACTÈRE demanderait du texte enrichi par portions, modèle que ce produit ne porte pas, écart assumé). Remplacement local SANS AUCUNE STRUCTURE NEUVE : `layer.style`, déjà là, fait déjà office de remplacement — un champ qui y est réglé gagne TOUJOURS sur le style, champ par champ ; supprimer le style ne change donc RIEN à l'écran, seuls les champs jamais réglés localement redeviennent vides. Panneau dédié pour régler la DÉFINITION du style lui-même (distinct du panneau d'un calque, lequel écrit toujours un remplacement local), « Effacer les remplacements » qui revient exactement au style. Écarté par construction, comme le style de caractère : les STYLES IMBRIQUÉS, GREP et SUIVANTS (des automatismes de style de caractère à l'intérieur d'un style de paragraphe), sans objet sans texte enrichi par portions. |
+| D5 | Images, liens, cadrage, habillage de texte | codé et vérifié | Vérifié dans le code avant tout ajout : le placement d'image, le point focal de recadrage (Photoshop 6) et le récupérateur de contenu (D2) couvraient déjà le cadrage. La voie liée/incorporée existait déjà (I7, `embedImages`). Le vrai gap : AUCUN habillage de texte, un obstacle posé sur du texte se faisait toujours ignorer plutôt qu'évité. Construit en MODE BOÎTE ENGLOBANTE UNIQUEMENT (le plus fiable des trois modes qu'InDesign documente) : la forme réelle et la trajectoire de détourage exigeraient une analyse du canal alpha d'une image ou une intersection vectorielle avec un tracé, hors de portée d'un rendu CSS statique, écartées par disproportion plutôt qu'oubli. Mécanisme CSS NATIF, sans la moindre géométrie de texte à courir soi-même : `computeTextWrap` (fonction pure, deux boîtes en entrée) calcule où et de quelle taille poser un flottant INVISIBLE (`float:left`/`right`) en tout premier enfant du texte ; le paragraphe qui le suit dans le flux l'évite tout seul, c'est le moteur de mise en page du navigateur qui fait le travail. Un calque texte choisit son obstacle par un simple sélecteur (`wrapAroundId`, n'importe quel autre calque, garde-fou anti-auto-référence comme `connectFrom`/`connectTo`) et une marge (`wrapGap`, 0 à 80 px) ; un obstacle masqué ou supprimé désactive l'habillage de lui-même, exactement le comportement d'un cadre masqué dans InDesign. Sur le canevas, une zone en pointillés (`.zrm-wrap-zone`) montre EN DIRECT l'espace réellement évité, calculée par la même fonction que celle qui pose le flottant dans le HTML compilé — jamais une estimation séparée qui pourrait diverger. Choix de portée assumé, à la différence du comportement réel d'InDesign : l'habillage reste un OPT-IN explicite posé sur le bloc de texte qui doit éviter un objet précis, jamais un évitement automatique de tout texte à proximité de tout obstacle — un recalcul global à chaque mutation aurait été disproportionné pour ce que la portée réelle des maquettes ZenRay demande. Le sélecteur d'obstacle n'est pas non plus borné à la diapositive active (même absence de portée que `wrapAroundId`/`threadNextId` déjà validée aux cartes D3/Miro 6) : cohérent avec l'existant plutôt qu'une règle neuve inventée pour cette seule carte. |
+| D6 | Marges, colonnes, repères, grilles, alignement | codé et vérifié | Vérifié dans le code avant tout ajout : L'ALIGNEMENT, mutuel et sur le canevas, était déjà couvert (`alignPatch`/`distributePatch`, Photoshop 2/PowerPoint 2) — rien à y ajouter. Le vrai gap : aucun REPÈRE PERSISTANT n'existait, seul le magnétisme AUTOMATIQUE et transitoire de `snapMove`, qui s'efface avec le geste qui l'affiche. Nouveau : `composition.guides`, un repère persistant (ligne verticale ou horizontale, posée une fois, qui reste) — posé d'un clic sur la RÈGLE (devenue cliquable, au centre du canevas sur l'axe cliqué), déplacé par glisser, retiré par double-clic. Les MARGES ET COLONNES d'InDesign, une fois posées, ne sont RIEN D'AUTRE qu'un jeu de tels repères calculé d'un coup : « Générer les repères » (nouveau formulaire Haut/Bas/Gauche/Droite/Colonnes/Gouttière) REMPLACE le jeu actuel par les quatre marges et une ligne au CENTRE de chaque gouttière interne — mêmes repères, ensuite librement déplaçables ou supprimables un par un, exactement comme ceux posés à la main ; AUCUN second système à synchroniser. `snapMove` est ÉTENDU (5e paramètre optionnel, retro-compatible) pour accrocher AUSSI sur ces repères, comme sur le bord d'un autre calque — sans ça, poser un repère n'aurait servi qu'à le regarder, jamais à s'y aligner réellement. LA GRILLE : un quadrillage régulier (`composition.showGrid`/`gridSize`, 4 à 200 px), PUREMENT VISUEL, sans accroche — une référence à l'œil, pas un second système de magnétisme à maintenir en plus des repères, portée volontairement réduite face au gain marginal. Choix de portée assumé : contrairement à InDesign où les marges/colonnes restent une propriété LIVE de la page (les modifier replace les guides tout seul en continu), ici « Générer » reste un geste explicite et ponctuel — une synchronisation live aurait rouvert la même complexité que les pages parentes (carte D1) pour un usage réel (affiches/visuels au format unique) qui n'en a pas besoin. Repères et marges/colonnes partagent une seule couleur (cyan), volontairement indifférenciée de leur origine (manuelle ou générée) : une fois posé, un repère n'a plus besoin de se souvenir d'où il vient. |
+| D7 | Couleurs, contours, effets, styles d'objet | codé et vérifié | Vérifié dans le code avant tout ajout : COULEURS (fond uni et dégradé, F7), CONTOURS (`border`, un champ CSS libre) et EFFETS (opacité, onze modes de fusion, flou/luminosité/contraste/saturation, ombre portée) portaient déjà de vrais réglages dédiés dans la section Apparence — rien à y ajouter. Le vrai gap, déjà nommé PAR ÉCRIT à la carte D4 (commentaire au-dessus de `TEXT_STYLE_KEYS`, posé par anticipation) : un STYLE D'OBJET NOMMÉ, l'équivalent partagé pour l'APPARENCE de ce que D4 a construit pour la typographie. Même mécanisme EXACTEMENT que D4 : `layer.style` fait déjà office de remplacement local, un champ réglé là gagne toujours sur le style, champ par champ, aucune structure neuve. `OBJECT_STYLE_KEYS` (fond, marge intérieure, rayon, bordure) est le complément FERMÉ de `TEXT_STYLE_KEYS` dans `LAYER_STYLES` — les deux listes ne se recouvrent JAMAIS, si bien qu'un calque texte peut porter à la fois un style de paragraphe (D4) ET un style d'objet (celui-ci) simultanément, sans collision, vérifié par test à l'unité et à l'interface. S'applique à N'IMPORTE QUEL calque, texte compris, jamais restreint à un seul kind. `compile.js` compose les deux résolutions l'une après l'autre (texte puis objet) sur le même style déjà fusionné. Écarté par construction, écart assumé plutôt qu'oublié : opacité, fusion, dégradé et effets restent HORS du style partagé, parce qu'ils ne vivent pas dans `layer.style` mais en propriétés propres du calque — les y inclure aurait demandé une seconde structure de remplacement, quand le vrai « styles d'objet » d'InDesign les couvre via des catégories cochables séparément, un système plus riche que ce que des affiches et visuels sociaux réclament ici. |
+| D8 | Contrôle en amont, assemblage, exportation | codé et vérifié | Vérifié dans le code avant tout ajout : L'EXPORTATION était déjà couverte (HTML/PNG/PDF, `exporters.js`). L'ASSEMBLAGE (« Package » InDesign : copier document + polices + images liées dans un dossier portable) est déjà RÉSOLU, autrement et mieux : `embedFonts`/`embedImages` produisent un fichier UNIQUE et AUTONOME, aucun dossier Liens ni Polices à transporter à côté — rien à construire, un fichier qui marche seul bat un dossier de trois éléments pour la portabilité. Le vrai gap : aucun CONTRÔLE EN AMONT (Preflight) ne prévenait Matthieu, avant d'exporter, d'un problème sur ses images ou son texte. Nouveau : un indicateur dans la barre d'outils du canevas (coche si rien à signaler, triangle sinon, jamais un blocage — Matthieu reste libre d'exporter avec des points ouverts), ouvrant un panneau qui liste trois signaux tous RÉELLEMENT MESURÉS, jamais devinés : le texte en excès (réutilise `overflowingLayerIds`, déjà mesuré à la carte D3, aucune duplication), l'image SANS SOURCE (donnée pure, `layersMissingImageSource`, à jour immédiatement à chaque frappe), le LIEN QUI NE CHARGE PAS et la RÉSOLUTION TROP BASSE (mesurées sur le `<img>` réellement chargé dans l'aperçu — `naturalWidth`, comparé à ce que la densité d'export exige pour la taille affichée). Cliquer un point sélectionne le calque en cause, comme n'importe quelle autre pièce de la Hiérarchie. Choix de portée assumé : le contrôle porte sur la diapositive ACTIVE, celle réellement rendue à l'écran (même portée que le texte en excès, D3) — balayer les diapositives une à une contrôle tout le document, comme on les parcourt déjà pour les prévisualiser ; un balayage automatique de TOUTES les diapositives à la fois aurait exigé de recompiler et remesurer chacune séparément, disproportionné face au gain. Limite de test honnête : le lien rompu et la basse résolution dépendent du chargement RÉEL d'une image (`naturalWidth`), que l'environnement de test ne simule pas (aucun décodage d'image dans jsdom) — seule l'image sans source, donnée pure, est vérifiée à l'interface ; même limite déjà acceptée pour le texte en excès (`scrollHeight`), jamais testé à ce niveau non plus. **Les huit familles InDesign (D1 à D8) sont closes.** |
+
+## Journal des validations
+
+| Date | Carte | Verdict de Matthieu |
+|---|---|---|
+| 2026-08-04 | L1 à L6 | « Sick, ça commence à être beaucoup mieux » — validé, avec réserves traitées en L9 à L11 |
+| 2026-08-04 | L9 à L11 | portes vertes, 456 tests, en attente du verdict |

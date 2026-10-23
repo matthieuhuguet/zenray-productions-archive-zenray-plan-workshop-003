@@ -1,0 +1,677 @@
+# ZenRay OS — Master Plan
+
+Document de référence pour transformer ZenRay d'un clone Notion en **OS web cloudé** : Notion + Finder + Eagle réunis, design Apple Liquid Glass sur thème Finder clair. Pensé pour des semaines de dev. Chaque section est actionnable, ancrée dans le code réel (numéros de ligne vérifiés sur `src/App.jsx` 1497 lignes, `src/theme.js` 106 lignes, `api/page.js` 149 lignes).
+
+---
+
+## 1. Vision et principes de l'OS
+
+ZenRay devient un **système d'exploitation personnel dans le navigateur** où tout — pages, bases, images, vidéos, tableaux de bord, candidatures — vit dans un seul espace nommé **Create**, posé sur un drive GitHub (repo public `zenray-content` + shards privés `zenray-media-NN`). Le principe unique : **un seul backbone** (un arbre de nœuds typés, façon Finder fusionné avec Notion), **une seule source de vérité** (le fichier sur GitHub), **un seul jeu de gestes** (sélection, Espace = Quick Look, glisser-déposer, zoom). On ne fusionne pas les données hétérogènes : on construit une coquille qui ne connaît pas le contenu, et on branche un *renderer* par type. Le rendu est translucide et clair (Liquid Glass / Finder white) : le **chrome** (barres, panneaux, menus) est en verre, le **contenu** (grille, page, tableur, image) reste opaque et net. But final : Matthieu crée, range, retrouve et publie tout depuis une seule fenêtre, sans jamais perdre une donnée, avec le « feeling » d'un Mac.
+
+---
+
+## 2. Architecture cible
+
+### 2.1 Le modèle de nœud unifié (modèle A retenu par le jury)
+
+Tout élément de Create est un **Node**. Le `type` n'est **pas** stocké en double : il est **dérivé du chemin du fichier** (seule source de vérité, jamais de désynchronisation possible). C'est l'explicitation de ce qui est aujourd'hui implicite dans `entriesOf` (App.jsx l.728) et `buildTree` (l.503).
+
+```
+Node {
+  id:          'pages/Build/Calendar'      // = dir, identité stable (déjà le cas partout)
+  name:        'Calendar'
+  type:        'page'|'folder'|'db'|'media'|'image'|'audio'|'canvas'|'embed'
+  contentPath: 'pages/Build/Calendar.md'   // le fichier réel, null si dossier pur
+  hasKids:     true                         // a des sous-nœuds
+  // champs legacy conservés (sur-ensemble, zéro régression) :
+  isDb, isMedia
+}
+```
+
+**`type` calculé par suffixe** (le plus spécifique d'abord) :
+
+```
+.db.json     -> db          .canvas.json -> canvas
+.media.json  -> media       .embed.json  -> embed/audio
+.img.json    -> image       .md          -> page
+(pas de fichier feuille)    -> folder
+```
+
+**Pourquoi `id === dir`** : c'est déjà l'identité utilisée partout (sélection `Set<dir>`, favoris, cible de drop). Au renommage/déplacement, l'id change — c'est correct : dans un Finder, l'identité d'un fichier EST son emplacement. On ne crée pas d'ID flottant (ce serait une 2e source de vérité à synchroniser, le piège mortel).
+
+**Migration sans risque** : les nouveaux builders produisent **tous** les champs anciens (`isDb`, `isMedia`, `hasKids`) en plus de `type`. Le code existant qui lit `e.isDb` continue de marcher ; le nouveau lit `e.type`. La sortie est un sur-ensemble de l'entrée → aucune régression possible.
+
+### 2.2 Renderers par type : un registre, un dispatch
+
+Depuis le 9 October 2026, le dispatch Create passe par `src/create/registry.jsx`. Le registre porte les renderers et les métadonnées, tandis que `UnifiedViewer.jsx` reste une façade compatible avec Quick Look.
+
+```
+REGISTRY[type] = {
+  Renderer,        // le composant qui ouvre le nœud
+  open,            // 'navigate' | 'editor' | 'overlay'
+  icon,            // l'icône de grille/arbre
+  quickLook,       // le mode d'aperçu Espace : 'markdown'|'image'|'db'|'media'|'folder'|'canvas'|'embed'|'file'
+  ext,             // l'extension de stockage
+  creatable        // apparaît-il dans "+ Nouveau" ?
+}
+```
+
+Ajouter un type futur (PDF, font, code, 3D) = **une entrée dans le registre et un composant**. `NodeRenderer({node})` choisit le renderer depuis le type dérivé du chemin. Le routeur conserve les exceptions audio dans Create et délègue le reste au champ `open`.
+
+```
+NodeRenderer({node}) ─► REGISTRY[node.type].Renderer
+                         signature commune ({t, path, title, paths, onOpenPage})
+```
+
+### 2.3 Single source of truth + liaison bidirectionnelle
+
+Le vœu « un élément modifié quelque part se met à jour partout » se réalise **par référence, jamais par copie**, et **l'inverse est dérivé, jamais stocké** (sinon les deux côtés divergent).
+
+```
+Stockage (source unique)              Index inverse (dérivé, recalculé)
+─────────────────────────             ─────────────────────────────────
+Canvas dit  "je place pages/Sport" ─► linkIndex: pages/Sport <- [Dashboard]
+page .props.json: relation -> X    ─► linkIndex: X <- [cette page]
+db cellule relation -> Y           ─► linkIndex: Y <- [cette base]
+markdown [[mention]]               ─► linkIndex: mention <- [cette page]
+hiérarchie parent/enfant           ─► GRATUIT (vient des paths, 80% des liens utiles)
+```
+
+**Flux concret** : modifier une carte du dashboard qui référence « Sport » → on écrit **uniquement** dans `Dashboard.canvas.json`. Ouvrir la page « Sport » → `PropertiesBlock` interroge `linkIndex.get('pages/Sport')` → affiche « Apparaît dans : Dashboard » (cliquable). La liaison bidirectionnelle est **gratuite et incassable** car l'inverse n'est jamais persisté.
+
+**Diffusion temps réel** : `CreateContext` (React) détient `paths` + `linkIndex` + `bump()` partagés par tous les onglets d'une même fenêtre ; `BroadcastChannel('zr-create')` prévient les autres fenêtres au save (re-fetch ciblé). ~15 lignes, compatible avec le pattern localStorage existant.
+
+**Honnêteté de scope** : la v1 livre la liaison **hiérarchie + carte↔page** (un seul lien, modèle `relation` déjà supporté dans `.props.json` et `.db.json`). Le watcher universel temps réel sur tout (DB↔gallery↔pages) est une roadmap, pas la v1. À ne pas survendre.
+
+### 2.4 Schéma d'ensemble
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  CreateContext  (paths, linkIndex, bump, BroadcastChannel)         │
+│                                                                    │
+│  ┌─ buildTree / entriesOf  ── type dérivé du chemin ──┐            │
+│  │     produit des Node {id,name,type,contentPath,...} │            │
+│  └─────────────────────────────────────────────────────┘          │
+│                          │                                         │
+│   ┌──────────────────────┴───────────────────────┐                │
+│   │   BACKBONE (coquille, ne connaît pas le type) │                │
+│   │   sélection · tri · DnD · favoris · tags ·    │                │
+│   │   Quick Look (Espace) · zoom · raccourcis     │                │
+│   └──────────────────────┬───────────────────────┘                │
+│                          │ dispatch                                │
+│      REGISTRY[type].Renderer  ──►  page / db / media / image /     │
+│                                     canvas / embed / audio          │
+│                                                                    │
+│   Backend INCHANGÉ : api/page (CRUD GitHub + twins) · api/img ·    │
+│   api/media · api/stream · api/shard                               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Refonte IA / Sidebar
+
+### 3.1 Arbre de navigation cible (3 zones)
+
+```
+ZONE 1 — Create  (backbone + source de vérité partagée)
+  ✦ Home         canvas draggable (ex-Dashboard)
+  ⧉ Bases        agrégat des *.db.json (ex-Databases)
+  ◳ Galerie      images + médias, vue Eagle (ex-Gallery)
+  ⊞ References    references/manifest.json, read-only virtualisé
+  ⊟ Projects     projects.json (collection)
+  ⊠ Freelance    applications.json (collection)
+  ⤓ Archive      cartes groupées par mois (filtre de Home)
+  📁 dossiers     pages/* habituels (arbre actuel inchangé)
+
+ZONE 2 — Apps séparées (cycle de vie propre, réutilisent un moteur)
+  ♫ Audio        lecteur global, OAuth Spotify
+  ✎ Articles     éditeur + chaîne de publication
+  ▤ Documents     repos GitHub read-only
+  ◷ Roadmap      build/tasks.json (Kanban)
+
+ZONE 3 — Système
+  🗑 Trash        corbeille, 2e backup
+  ☀/☾ thème · ● cloud/local
+```
+
+Règle de lecture : **Zone 1** = « ce que je crée, qui partage un backbone + une source de vérité ». **Zone 2** = « applications à logique propre qui réutilisent des moteurs (BlockNote, lecteur), pas le modèle fichier-dossier ». **Zone 3** = sécurité.
+
+### 3.2 Mapping de CHAQUE ancienne vue
+
+| Ancienne vue | Composant actuel | Nouvel emplacement | Justification |
+|---|---|---|---|
+| **Dashboard** | `Board` (l.213) | **Create › Home** (canvas) | Devient un canvas draggable ; partage `state.cards` avec Archive. Vœu explicite Matthieu. |
+| **Databases** | `Databases.jsx` | **Create › Bases** | Agrégat des `.db.json` rangés dans `pages/`. Backend déjà multi-racines. |
+| **Gallery** | `Gallery.jsx` | **Create › Galerie** | Vue Eagle (grille + inspecteur). Cœur de l'expérience Eagle. |
+| **References** | `Gallery.jsx` paramétré | **Create › References** | Idem, `readOnly`. 110k AVIF virtualisés via manifest (pas via `tree`). |
+| **Projects** | `Projects` (l.1275) | **Create › Projects** | Collection statique, déjà sur le backbone `Views`. |
+| **Archive** | `Archive` (l.393) | **Create › Archive** | Vue dérivée de `state.cards` (filtre date de Home). Liaison déjà gratuite. |
+| **Freelance** | `Freelance` (l.421) | **Create › Freelance** | Collection de fiches. Déjà sur `Views`. |
+| **Audio** | `Audio.jsx` | **Zone 2, SÉPARÉ** | Lecteur global persistant (`PlayerProvider`) qui survit aux changements d'onglet. Pas de dossier, pliage = perte de la persistance. |
+| **Articles** | `Articles.jsx` | **Zone 2, SÉPARÉ** | Voir tranchage §3.3. |
+| **Documents** | `Docs` (l.1298) | **Zone 2, SÉPARÉ** | Read-only strict sur repos externes (Memory, .claude). Pas d'édition ≠ Create. Décision Matthieu. |
+| **Trash** | `Trash` (l.1247) | **Zone 3, SÉPARÉ** | 2e backup, interface de restauration. Décision Matthieu. |
+| **Roadmap** | `BuildBoard.jsx` | **Zone 2, SÉPARÉ** | Task board lié à PLAN.md/CLAUDE.md. (Pourrait devenir une base `.db.json` plus tard, faible priorité.) |
+
+### 3.3 Articles : TRANCHÉ — reste séparé
+
+**Décision : Articles ne se plie pas dans Create. Il réutilise l'éditeur, pas le backbone.**
+
+Argument décisif vérifié dans le code : `api/publish.js` existe comme pipeline distinct (push vers le repo du site, déploiement GH Pages). Un article a un **cycle de vie de publication** — brouillon → publié → URL live → dépublication — porté par un état métier (`status:'draft'|'published'`, `slug`, date de parution) qui **n'a aucun équivalent dans le modèle « fichier rangé dans un dossier »**. Le modèle Create répond à « où est rangé ce fichier, quelles métadonnées y sont attachées ». Le modèle Article répond à « ce contenu est-il publié, à quelle URL ». Forcer un statut de publication sur un nœud Finder **pollue le backbone et fausse le single source of truth** (un fichier rangé n'a pas d'état « publié »).
+
+**Ce qu'on fait à la place** : Articles **consomme le même moteur d'édition** (`PageEditorBN.jsx`, déjà partagé). Optionnellement, un article référence un brouillon source (`article.sourceNode: 'pages/Brouillons/x.md'`). Édition mutualisée, état métier séparé. Frontière propre : **Create = rangement, Articles = chaîne éditoriale**.
+
+### 3.4 La brique nouvelle : la « section »
+
+Le backbone manipule un `folder` string. On ajoute un **contexte de section** au-dessus :
+
+```
+cur = {
+  section: 'home'|'files'|'bases'|'gallery'|'references'|'projects'|'freelance'|'archive',
+  folder:  'pages/...',   // pertinent seulement si section==='files'
+  path:    'pages/x.md'   // nœud ouvert, ou null
+}
+```
+
+Home/Bases/Galerie/Archive **ne sont pas** des dossiers du repo : ce sont des **vues calculées** sur des sources hétérogènes (`state.cards`, agrégat `.db.json`, manifest). Forcer un faux dossier `pages/Home/` créerait des fichiers fantômes et casserait `entriesOf`. **La section est une vue, pas un chemin.** Persisté en `zr:create:nav` (remplace `zr:create:cur`).
+
+**Désambiguïsation des noms** (le mot `view` est déjà pris 2 fois) : renommer rigoureusement en `appView` (board/create/audio…), `section` (home/files/bases…), `layout` (icons/list/gallery, l'ancien `view` local de `Pages`).
+
+### 3.5 Migration douce du routing (zéro écran blanc)
+
+Au boot, si `zr:view` ∈ {board, db, gallery, references, projects, freelance, archive, pages}, le réécrire en `appView='create'` + `cur.section` correspondante. Une table de mapping suffit. Garantit que onglets sauvegardés (`zr:tabs`) et favoris ne cassent pas pour un utilisateur existant. **À tester avec un localStorage rempli.**
+
+---
+
+## 4. Expérience Eagle
+
+### 4.1 Décision structurante : image = page
+
+**L'unité Eagle n'est PAS un fichier image autonome. C'est l'image-comme-page déjà existante, enrichie.** Une image collée < 4 Mo devient déjà une page `.md` contenant `![](url)` (App.jsx ~l.808). On réutilise donc à 100% le pipeline « twins » (`.md` + `.blocknote.json` + `.comments.json` + `.props.json`, déplacés/supprimés ensemble par `movePage` et `trash`), `PropertiesBlock`, `PageThumb`, la sélection, le DnD. **Zéro chantier backend, zéro migration.**
+
+L'alternative (vrai fichier `photo.avif` autonome) forcerait à réécrire `entriesOf`, `move`, `trash`, `PageThumb` → rejetée.
+
+Une image rangée = un `.md` (enveloppe + `![](url)`) + son jumeau `.props.json` enrichi d'un **bloc `eagle`** (rétrocompatible, n'altère pas `{icon,cover,date,place,custom}`) :
+
+```jsonc
+"eagle": {
+  "kind": "image",            // SEUL flag de détection
+  "src":  "uploads/abc.webp", // l'URL réelle (= /api/img?path=…), découple fiche et binaire
+  "w": 3840, "h": 2160, "bytes": 1234567, "mime": "image/webp",
+  "rating": 4,                // 0..5 étoiles
+  "tags": ["nature","sunset"],// tags TEXTE (distincts des tags COULEUR Finder de .zr-tags.json)
+  "url": "https://…",         // URL source
+  "notes": "",                // notes courtes (le corps .md = notes longues riches)
+  "addedAt": 1738400000000,
+  "usedAt":  1738500000000    // maj à chaque ouverture -> vue "Recently Used"
+}
+```
+
+### 4.2 Le triptyque Eagle
+
+```
+┌─────────────┬───────────────────────────┬──────────────────┐
+│ Arbre       │  Grille zoomable          │ EagleInspector   │
+│ (dossiers)  │  (nom + dimensions)       │ (panneau droit)  │
+│             │                           │                  │
+│ 📁 2025    │  ┌────┬────┬────┐         │ aperçu image     │
+│ 📁 Hawaii  │  │IMG │IMG │IMG │         │ 📝 Notes (auto)  │
+│ 🏷 sunset   │  ├────┼────┼────┤         │ 🏷 #tags texte   │
+│             │  │IMG │IMG │IMG │         │ ★★★★ rating      │
+│             │  └────┴────┴────┘         │ 🔗 URL source    │
+│             │  ═══ [ZOOM slider] ══     │ 📂 dossier       │
+│             │                           │ dim/taille/type  │
+│  Espace =   │                           │ dates · Exporter │
+│  Quick Look │                           │                  │
+└─────────────┴───────────────────────────┴──────────────────┘
+```
+
+### 4.3 Composants
+
+**À CRÉER**
+- `src/components/QuickLookOverlay.jsx` — Quick Look plein écran macOS (la feature signature). Props `{t, items, index, onIndex, onClose, onOpen}`. Rend selon le type : image → `<img>` plein cadre ; média → `<video>/<audio>` sur `/api/stream` ; page → réutilise le `QuickLook` markdown existant (l.1125) ; base → aperçu read-only des 1res lignes. Clavier interne : `←/→` change l'index (+ préchargement voisins via `new Image()`), `Espace`/`Esc` ferme, `Enter` ouvre. Design : couche **Clear + dimming** (`.zr-quicklook-chrome`).
+- `src/components/EagleInspector.jsx` — panneau droit (= page Notion attachée à l'image). Réutilise la logique load/save de `PropertiesBlock` extraite en hook `useProps(path)`. Édite le bloc `eagle` (notes textarea debounce 800ms, tags chips, rating étoiles, URL). Sections lecture seule auto : dimensions, taille, type, dates. Bouton Exporter (`<a download>` ou `/api/stream` pour chunké).
+- `src/eagle/meta.js` — helpers purs : `readEagle/writeEagle`, `matchSmartFolder/applySmart`, `orientationOf(w,h)`, `domainOf(url)`, et `uploadImageAsCard(file, folder)` (pipeline : upload `/api/img` → lit w/h via `createImageBitmap` → écrit `.md` + `.props.json` + met à jour l'index agrégé).
+
+**À MODIFIER**
+- `src/App.jsx > Pages()` : flag `isImage` dans `entriesOf` (l.728) lu depuis l'**index agrégé** (voir 4.5) ; slider `zoom` dans la toolbar ; bloc `quick` (l.1100) remplacé par `QuickLookOverlay`; colonne droite `EagleInspector` quand `selected.size===1 && isImage`; drop d'image **silencieux** (lever le `window.confirm` de `movePage` ~l.651 pour les images uniquement).
+- `src/media/chunked.js > uploadChunked` : lire `w/h` (images via `createImageBitmap`, vidéos via `<video>.loadedmetadata`) et les passer à `commit`.
+- `api/media.js` (commit, ~l.70) : écrire `w/h` au manifeste (3 lignes, champ optionnel, anciens manifestes valides).
+- `src/components/Gallery.jsx` : greffer `QuickLookOverlay` + zoom pour cohérence (sans dupliquer l'inspecteur).
+
+### 4.4 Smart Folders + vues système
+
+**Smart Folders** dans un seul fichier `pages/.zr-eagle.json` :
+
+```jsonc
+{ "smart": [
+  { "id":"sf1", "name":"5 étoiles", "match":"all",
+    "rules":[ {"field":"rating","op":">=","value":5} ] },
+  { "id":"sf2", "name":"Portraits non taggés", "match":"all",
+    "rules":[ {"field":"orientation","op":"=","value":"portrait"},
+              {"field":"tagCount","op":"=","value":0} ] }
+] }
+```
+
+Champs filtrables (depuis `eagle.*`) : `rating`, `tags`, `tagCount`, `w`, `h`, `orientation`, `mime`, `bytes`, `url` (domaine), `addedAt`, `usedAt`, `name`. Combinaison ET (`all`) / OU (`any`). C'est un `Array.filter` pur **une fois les métadonnées présentes** → smart folders APRÈS la couche métadonnée.
+
+**Vues système** (calculées, pas de fichier) : **All / Uncategorized / Untagged** (`tagCount===0`) **/ Recently Added** (`addedAt`) **/ Recently Used** (`usedAt`) **/ Random** (shuffle). Trash = onglet séparé existant.
+
+### 4.5 Stockage et perf (LE risque n°1)
+
+Charger un `.props.json` par image **tue la grille à grande échelle**. Mitigation **obligatoire** : un **index agrégé** `pages/.zr-eagle-index.json` `{ "pages/x.md": {kind,w,h,src,rating,tags} }`, maintenu à l'écriture — **même pattern éprouvé que `.zr-tags.json`**. Un seul fetch, en mémoire. Le `.props.json` individuel n'est lu qu'à la sélection (inspecteur) ou au Quick Look. Bouton « Réindexer » pour reconstruire l'index depuis les `.props.json` (résilience à l'édition hors-app).
+
+Pour References/Galerie volumineuses : **ne pas charger via `action=tree`** (plafond GitHub ~100k entrées, `truncated:true` ignoré côté client). Charger le `manifest.json` (déjà la source de Gallery.jsx) et dériver les entrées. Espaces « fichiers » via `tree`, espaces « médias massifs » via manifest. Ne créer des nœuds `image` que pour les images **activement rangées/annotées** (centaines), pas le catalogue brut de 110k.
+
+### 4.6 Raccourcis clavier
+
+| Touche | Action | Statut |
+|---|---|---|
+| **Espace** | Quick Look plein écran (sélection unique) | existant l.844, étendre aux images |
+| **← / →** *dans* Quick Look | image précédente / suivante | à ajouter |
+| ← → ↑ ↓ (grille) | déplacer la sélection | existant l.863 |
+| Enter | ouvrir | existant l.869 |
+| Cmd+A | tout sélectionner | existant l.862 |
+| Backspace/Delete | corbeille | existant l.870 |
+| Cmd/Shift+clic | multi / plage | existant l.833 |
+| **1–5** (Quick Look/inspecteur) | noter 1–5 étoiles | à ajouter, optionnel |
+| **Tab** | masquer sidebar + inspecteur (focus viewer) | à ajouter |
+
+**Garde-fou impératif** : tous les handlers ignorent l'événement si `document.activeElement` est INPUT/TEXTAREA/contentEditable (déjà l.849/l.860) — sinon `Espace` et les flèches cassent la frappe dans les notes.
+
+---
+
+## 5. Design System Liquid Glass / Finder white
+
+Source : WWDC25 « Meet Liquid Glass ». 8 principes traduits en CSS web réaliste. Le verre web = 3 couches empilées : `backdrop-filter: blur() saturate()` (concentre la couleur du fond) + fond blanc semi-transparent (teinte) + highlight d'arête en `inset box-shadow`.
+
+### 5.1 Règle d'architecture (la plus importante)
+
+**Le verre est réservé à la couche NAVIGATION qui flotte au-dessus du contenu.** Deux couches strictes :
+- **CONTENU (z bas, OPAQUE, jamais de verre)** : grille de fichiers, tableur `.db.json`, corps de page `.md`, aperçu d'image.
+- **CHROME (z haut, en verre)** : sidebar, barre d'onglets, toolbar, panneau méta droit, palette, Quick Look, menus, slider de zoom.
+
+Anti-règles Apple à graver : **« avoid glass on glass »** (jamais une carte en verre dans une sidebar en verre) ; **le tint coral (`#F38A5C`) sert l'emphase** (action primaire, état actif), pas un fond partout.
+
+### 5.2 Tokens CSS (à poser dans le `<style>` global de `index.html`)
+
+```css
+:root {
+  /* FINDER WHITE — fonds par couche */
+  --zr-bg-window:   #ECECEE;                   /* fond fenêtre, gris Finder (PAS blanc pur) */
+  --zr-bg-content:  #FFFFFF;                   /* couche contenu, opaque */
+  --zr-bg-sidebar:  rgba(246,246,248,0.72);
+
+  /* VERRE REGULAR — chrome */
+  --zr-glass-bg:        rgba(255,255,255,0.68);
+  --zr-glass-bg-strong: rgba(255,255,255,0.82);
+  --zr-glass-blur:      20px;
+  --zr-glass-blur-thick:40px;
+  --zr-glass-sat:       180%;                  /* sur-saturation = effet "colored glass" */
+  --zr-glass-filter:       blur(var(--zr-glass-blur)) saturate(var(--zr-glass-sat));
+  --zr-glass-filter-thick: blur(var(--zr-glass-blur-thick)) saturate(200%);
+
+  /* VERRE CLEAR — Quick Look sur média UNIQUEMENT (+ dimming obligatoire) */
+  --zr-clear-bg:    rgba(255,255,255,0.10);
+  --zr-clear-filter:blur(12px) saturate(140%);
+  --zr-clear-dim:   rgba(0,0,0,0.55);
+
+  /* BORDURES LUMINEUSES (highlight spéculaire d'arête, PAS un border) */
+  --zr-edge-top:  inset 0 1px 0 rgba(255,255,255,0.70);
+  --zr-edge-ring: inset 0 0 0 0.5px rgba(255,255,255,0.55);   /* 0.5px = finesse Retina */
+  --zr-hairline:  0.5px solid rgba(0,0,0,0.08);
+
+  /* OMBRES indexées sur la taille (Apple : grand = ombre + profonde) */
+  --zr-shadow-chip:    0 1px 2px rgba(0,0,0,0.06), 0 1px 1px rgba(0,0,0,0.04);
+  --zr-shadow-panel:   0 8px 30px rgba(0,0,0,0.12);            /* = SHADOWS.apple actuel */
+  --zr-shadow-pop:     0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  --zr-shadow-overlay: 0 24px 80px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.14);
+
+  /* RAYONS + CONCENTRICITÉ (rayon_enfant = rayon_parent − padding) */
+  --zr-r-chip:7px; --zr-r-control:10px; --zr-r-panel:14px; --zr-r-window:22px;
+  --zr-pad-panel:16px;
+  --zr-r-nested: calc(var(--zr-r-panel) - var(--zr-pad-panel));
+
+  /* TEINTE PRIMAIRE (emphase uniquement) */
+  --zr-accent:      #F38A5C;
+  --zr-accent-soft: rgba(243,138,92,0.14);
+  --zr-selection:   rgba(0,122,255,0.16);      /* sélection fichier façon Finder (bleu système) */
+
+  /* MOUVEMENT (gel réactif) */
+  --zr-ease-base:   cubic-bezier(0.25,0.1,0.25,1.0);
+  --zr-ease-spring: cubic-bezier(0.175,0.885,0.32,1.275);     /* = TRANSITIONS.bounce */
+  --zr-t-fast:0.14s; --zr-t-glass:0.28s;
+}
+```
+
+### 5.3 Recettes prêtes
+
+```css
+.zr-glass {            /* sidebar, toolbar, panneau, onglets */
+  background: var(--zr-glass-bg);
+  backdrop-filter: var(--zr-glass-filter); -webkit-backdrop-filter: var(--zr-glass-filter);
+  box-shadow: var(--zr-edge-top), var(--zr-edge-ring), var(--zr-shadow-panel);
+  border-radius: var(--zr-r-panel);
+}
+.zr-glass-thick {      /* menus, popovers, slider zoom */
+  background: var(--zr-glass-bg-strong);
+  backdrop-filter: var(--zr-glass-filter-thick); -webkit-backdrop-filter: var(--zr-glass-filter-thick);
+  box-shadow: var(--zr-edge-top), var(--zr-edge-ring), var(--zr-shadow-pop);
+  border-radius: var(--zr-r-control);
+}
+.zr-quicklook-backdrop { background: var(--zr-clear-dim); backdrop-filter: blur(8px); }
+.zr-quicklook-chrome  {
+  background: var(--zr-clear-bg);
+  backdrop-filter: var(--zr-clear-filter); -webkit-backdrop-filter: var(--zr-clear-filter);
+  box-shadow: var(--zr-edge-ring), var(--zr-shadow-overlay);
+}
+.zr-content    { background: var(--zr-bg-content); }      /* grille, tableur, page : OPAQUE */
+.zr-item--selected { background: var(--zr-selection); border-radius: var(--zr-r-chip); }
+
+/* FALLBACK navigateur sans backdrop-filter -> verre opaque */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .zr-glass, .zr-glass-thick { background: var(--zr-glass-bg-strong); }
+}
+/* ACCESSIBILITÉ — respecter les réglages système Apple */
+@media (prefers-reduced-transparency: reduce) {
+  .zr-glass, .zr-glass-thick, .zr-quicklook-chrome { background: var(--zr-bg-content); backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) { .zr-glass-interactive { transition: none; } }
+```
+
+### 5.4 Évolution de `theme.js`
+
+**On garde** (déjà bon) : `PALETTE.primary #F38A5C` → `--zr-accent` ; système blue/green/red + System Grays ; `SHADOWS.apple` = `--zr-shadow-panel` ; `TRANSITIONS.bounce` = `--zr-ease-spring` ; `THEMES.light` reste la base.
+
+**On fait évoluer** :
+1. **Ajouter la 3e dimension « couche »** : un sous-objet `glass` dans `THEMES.light` (bg, bgStrong, filter, filterThick, edge, hairline) exporté en JS pour les styles inline existants. Ajouter `windowBg:'#ECECEE'` et `selection:'rgba(0,122,255,0.16)'`.
+2. **Dédoubler `card()`** : `card(t)` reste pour le contenu ; ajouter `glassPanel(t)` (background `t.glass.bg` + `backdropFilter` + `box-shadow` edge+apple) pour le chrome.
+3. **Bordures `1px` → hairline `0.5px`** sur les séparateurs du chrome (le `1px` actuel `#ececea` est trop épais pour le rendu Apple).
+4. **Body `#fff` → `#ECECEE`** dans `index.html` (`html,body{background}`) : le blanc pur tue l'effet verre (rien à laisser transparaître). Le **contenu** reste blanc, posé EN VERRE par-dessus le gris.
+5. **Concentricité** : garder l'échelle de `RADII`, introduire `--zr-r-nested` (calc) pour les contrôles imbriqués.
+
+### 5.5 Application par écran
+
+| Élément | Couche | Token/classe |
+|---|---|---|
+| Sidebar arbo | chrome | `.zr-glass` + `--zr-bg-sidebar`, séparateurs hairline |
+| Barre d'onglets | chrome | `.zr-glass`, onglet actif `--zr-glass-bg-strong` |
+| Toolbar (recherche, vues, slider zoom) | chrome épais | `.zr-glass-thick` |
+| Grille de miniatures | **contenu opaque** | `.zr-content` |
+| Vignette sélectionnée | contenu | `.zr-item--selected` |
+| Panneau méta droit (EagleInspector) | chrome | `.zr-glass` |
+| Quick Look (Espace) | Clear + dimming | `.zr-quicklook-backdrop` + `.zr-quicklook-chrome` |
+| Menus contextuels / DnD | chrome épais | `.zr-glass-thick`, `--zr-shadow-pop` |
+| Tableur `.db.json` (DatabaseTable) | **contenu opaque** | `.zr-content` (tableview = couche contenu chez Apple) |
+| Corps page `.md` (BlockNote) | **contenu opaque** | `.zr-content` |
+| Canvas Dashboard | fond `--zr-bg-window` + cartes en `.zr-glass` flottantes | `--zr-shadow-pop` |
+
+---
+
+## 6. Feature Zoom dans Create
+
+Demande explicite de Matthieu. **Coût faible, effet immédiat, s'applique à tous les types** (grille unifiée).
+
+- État : `const [zoom, setZoom] = useState(150)` (px de colonne), persisté `zr:create:zoom`.
+- Grille `icons` (App.jsx l.951) : passer `gridTemplateColumns` de `minmax(118px,1fr)` fixe à `repeat(auto-fill, minmax(${zoom}px,1fr))`.
+- Slider rendu dans la toolbar en `.zr-glass-thick` (track + thumb = chrome). Plage suggérée 90–320px.
+- Pour les tuiles **image** : afficher l'image en couverture via `eagle.src` **direct** (pas via `PageThumb` qui re-fetch le markdown → plus rapide).
+- Raccourci optionnel `Z` pour afficher/masquer le slider.
+
+---
+
+## 7. Canvas Dashboard draggable + fullscreen-app
+
+### 7.1 Modèle de données (couche layout séparée de la donnée)
+
+`state` actuel = `{steps, cards, theme, updatedAt}` (`src/api.js` l.3). Une `card` = `{id,title,note,date,objId,domain,done,images[]}`. On **ajoute une couche layout optionnelle**, sans toucher au schéma carte :
+
+```jsonc
+state.canvas = {
+  home: {
+    items: { "[cardId]": { x, y, w, h } },   // position libre
+    z:     [ "cardId", ... ]                  // ordre d'empilement
+  }
+}
+```
+
+**Décision clé pour le single source of truth** : layout séparé de la donnée. Une carte garde son `date` (utilisé par le calendrier hebdo) ET reçoit `x/y/w/h` (canvas). La **même carte** vit dans le calendrier (par `date`) et sur le canvas (par `x/y`) — on déplace la **représentation**, jamais on ne duplique la carte. Carte sans entrée `items` → placement auto (flux). Rétrocompatible : `state.canvas` absent = comportement actuel.
+
+Variante avancée (modèle A) : un bloc canvas peut porter `ref:'pages/Sport'` (miroir vivant d'un nœud, lit en direct via `NodeRenderer` → reflète tout changement ailleurs) ou `inline:{...}` (contenu propre au canvas). Une base affichée en vue calendrier = `{ref:'…​.db.json', view:'calendar'}`.
+
+### 7.2 Composant `src/components/Canvas.jsx` (à créer)
+
+- Wrappe le contenu de `Board` (l.213) en mode positions libres.
+- Lit/écrit `state.canvas.home`.
+- Drag via **pointer events** (pas de lib lourde) : `onPointerDown` stocke l'offset, `onPointerMove` met à jour `x/y` (**debounce 300ms**), `onPointerUp` flush.
+- Bascule « flux » ↔ « canvas libre » via bouton. Le `WeekCalendar` reste un élément déposable sur le canvas, partageant `state.cards` (satisfait « la séquence calendrier partage le même backbone »).
+- Blocs `ref` rendent une **carte compacte** (titre + thumbnail + props), pas l'éditeur complet (sinon N éditeurs BlockNote montés = jank). L'éditeur ne se monte qu'au clic (ouverture plein cadre). Réutilise `PageThumb` (l.486) et `QuickLook` (l.1125).
+
+### 7.3 Fullscreen-app
+
+`Tab` masque sidebar interne + panneau droit + barre d'onglets → le Canvas prend tout l'écran, sous-éléments déplaçables librement (vœu Matthieu). `Esc` ressort (priorité : ferme d'abord l'overlay le plus haut s'il y en a un).
+
+### 7.4 Sécurité données canvas
+
+Déplacer 50 cartes = 50 mutations de `state`. Parade : debounce 300ms + flush sur `pointerUp`, et le canvas écrit dans `state.canvas` (couche à part) — si le save du **layout** échoue, les **cartes elles-mêmes ne sont jamais touchées**, aucune perte de contenu.
+
+---
+
+## 8. Plan d'exécution par phases
+
+Ordre par **dépendance**. Effort : S (≤2h) · M (½ journée) · L (1–2 jours) · XL (3 jours+). Chaque phase est **livrable et testable seule**, et **ne supprime aucune donnée avant que son remplaçant soit vérifié**.
+
+### Stratégie de non-régression (transversale, NON négociable)
+
+1. **Sur-ensemble** : les nouveaux builders produisent tous les champs legacy (`isDb`, `isMedia`, `hasKids`) en plus de `type`. On migre dispatch + index sans rien retirer ; on ne supprime un champ legacy qu'après test isolé du type concerné.
+2. **Extraction avant transformation** : `Pages()` (~675 lignes dans App.jsx) est extrait **à l'identique d'abord** (copier-coller, zéro changement de logique, Create doit être identique au pixel), **puis** on remonte `section`. Deux commits séparés.
+3. **Migration drive par AJOUT, jamais par destruction** : Galerie→`.img.json`, Projects→`.embed.json`, Freelance→`.md` = on **ajoute** des fichiers sans toucher aux manifests/JSON sources (double présence temporaire, le manifest devient un cache, retiré plus tard). Les vrais moves passent par `api/page` action `move` (l.103-139) qui est **atomique** (crée la cible, vérifie, puis supprime la source — jamais de perte si interrompu).
+4. **Concurrence** : SHA optimiste GitHub (409 → `error:'conflict'`, déjà en place l.71) + BroadcastChannel pour prévenir les autres onglets.
+5. **Migration localStorage** : table de mapping des `view` au boot (§3.5), testée avec un localStorage rempli, sinon écran blanc pour l'existant.
+6. **Liens morts gracieux** : au renommage d'un nœud référencé, réécriture des sources **best-effort non bloquante** ; un lien mort s'affiche grisé avec bouton « relier », jamais une page blanche. **Ne jamais bloquer un renommage sur la propagation.**
+
+### Pré-requis externes
+
+- **C205 (ffmpeg.wasm)** : bloqué en dev Vite (PROGRESS l.392-394). **N'est PAS un pré-requis du master plan.** Le streaming natif (mp4/webm/mp3/images) marche ; le Quick Look média s'appuie dessus. mkv/avi inline = chantier indépendant, à reprendre en passe dédiée (tester le build PROD, ou core ESM, ou core-mt + COOP/COEP). À mener **en parallèle**, jamais bloquant.
+- **C203 (Drive Dashboard)** : UI live des repos privés. **Pré-requis de la montée en charge Eagle** (scaler le pilote 100 → 115k images), car il faut créer/router les shards `zenray-media-NN` à ~4,5 Go. **Pas** pré-requis des phases 0-6. À placer avant la Phase 7 (montée en charge), pas avant l'expérience Eagle elle-même.
+- **Pilote Eagle 100 images** : déjà en place (`zenray-media-01`). Sert de banc de test pour Phases 3-4.
+
+---
+
+### PHASE 0 — Design System (fondation visuelle, débloque tout le « feeling »)
+- **Objectif** : poser les tokens `--zr-*`, le body gris, dédoubler `card()`/`glassPanel()`, appliquer le verre au chrome existant (sidebar, onglets, toolbar) sans toucher au contenu.
+- **Fichiers** : `index.html` (`<style>` + body bg), `src/theme.js` (sous-objet `glass`, `windowBg`, `selection`, `glassPanel`), `src/App.jsx` (classes sur Sidebar l.169, barre d'onglets l.124, toolbar Pages l.897).
+- **Effort** : M · **Risque** : Faible (cosmétique, fallback `@supports`).
+- **Avant** : rien.
+
+### PHASE 1 — Backbone unifié (le cœur, zéro régression)
+- **Objectif** : extraire `node.js` (type dérivé) + `buildNodes.js` (buildTree/entriesOf type-aware, sur-ensemble), brancher dans `Pages()`. Create identique au comportement actuel.
+- **Fichiers** : créer `src/create/node.js`, `src/create/buildNodes.js` ; modifier `src/App.jsx` (retirer `buildTree` l.503 / `entriesOf` l.728 locaux, importer, lire `e.type` ou champs legacy).
+- **Effort** : L · **Risque** : Élevé (cœur en prod) → mitigé par sur-ensemble + test type par type.
+- **Avant** : Phase 0 (facultatif) ; idéalement après extraction à l'identique de `Pages` (commit séparé).
+
+### PHASE 2 — Registry + NodeRenderer (extensibilité)
+- **Objectif** : centraliser le rendu de chaque type dans `REGISTRY` et `NodeRenderer`, puis router les ouvertures par `open`. Les exceptions musique et audio rapide restent explicites.
+- **Fichiers** : `src/create/registry.jsx` contient le registre, NodeRenderer et les renderers spécialisés ; `UnifiedViewer.jsx` délègue au registre ; `ResolvedUnifiedViewer.jsx` résout Eagle uniquement pour les types qui en ont déjà besoin ; `Pages.jsx` ne garde plus le dispatch conditionnel. C210e harmonise séparément les signatures.
+- **Effort** : M · **Risque** : Moyen.
+- **Avant** : Phase 1.
+
+### PHASE 3 — Zoom + Quick Look média (gros ratio effet/effort, le geste signature)
+- **Objectif** : slider de zoom sur la grille ; `QuickLookOverlay` multi-type avec `←/→` et préchargement ; Espace étendu aux images/médias.
+- **Fichiers** : créer `src/components/QuickLookOverlay.jsx` ; modifier `src/App.jsx > Pages()` (grille l.951, toolbar slider, bloc `quick` l.1100, déclencheur Espace l.844-855).
+- **Effort** : M · **Risque** : Faible.
+- **Avant** : Phase 0 (tokens Clear/dimming) + Phase 1.
+
+### PHASE 4 — Couche métadonnée Eagle + Inspector (la vision « page attachée à l'image »)
+- **Objectif** : bloc `eagle` dans `.props.json` ; `uploadImageAsCard` ; **index agrégé `.zr-eagle-index.json`** (perf obligatoire) ; `EagleInspector` (réutilise `useProps` extrait de `PropertiesBlock`) ; drop d'image silencieux ; dimensions vidéo dans `.media.json`.
+- **Fichiers** : créer `src/eagle/meta.js`, `src/components/EagleInspector.jsx` ; modifier `src/App.jsx` (`entriesOf` flag `isImage` via index, colonne droite, `movePage` l.651, extraire `useProps` de `PropertiesBlock` l.1143), `src/media/chunked.js`, `api/media.js` (commit w/h).
+- **Effort** : L · **Risque** : Moyen (perf → index agrégé impératif).
+- **Avant** : Phases 1-3.
+
+### PHASE 5 — Vues système + Smart Folders
+- **Objectif** : All/Uncategorized/Untagged/Recently Added/Recently Used/Random (calculées) ; Smart Folders (`pages/.zr-eagle.json`, `applySmart`).
+- **Fichiers** : `src/eagle/meta.js` (`matchSmartFolder/applySmart`) ; `src/App.jsx > Pages()` (sidebar gauche « Bibliothèque » + « Smart Folders », filtre `shownRaw`).
+- **Effort** : M · **Risque** : Faible.
+- **Avant** : Phase 4 (les métadonnées doivent exister).
+
+### PHASE 6 — Repli des espaces dans Create (sidebar 13→3, CreateShell)
+- **Objectif** : `CreateShell` + contexte de section ; replier Bases/Galerie/References/Projects/Freelance comme sections ; sidebar 3 zones ; migration localStorage des `view`.
+- **Fichiers** : créer `src/components/CreateShell.jsx`, `src/lib/createNav.js` ; modifier `src/App.jsx` (NAV l.171, routing l.139-154, `VIEW_LABELS` l.50, Sidebar l.169, migration boot) ; cosmétique sur `Gallery.jsx`/`Databases.jsx`/`Projects`/`Freelance`/`Archive` (largeur fluide).
+- **Effort** : XL · **Risque** : Élevé (réorg massive) → mitigé par migration localStorage testée + anciens composants gardés importables (rollback instantané).
+- **Avant** : Phases 1-2 (le backbone et le registry doivent exister pour héberger les sections).
+
+### PHASE 7 — Canvas Dashboard + fullscreen + montée en charge Eagle
+- **Objectif** : `Canvas.jsx` draggable (`state.canvas.home`), Home en section canvas, calendrier hebdo comme élément du canvas, fullscreen `Tab` ; liaison carte↔page (`pageRef`). Montée en charge du pilote Eagle (100 → 115k) si C203 prêt.
+- **Fichiers** : créer `src/components/Canvas.jsx`, `src/create/linkIndex.js`, `src/create/CreateContext.jsx` ; modifier `src/api.js` (`state.canvas`), `src/App.jsx` (Home section, `PropertiesBlock` « Apparaît dans »), `api/page.js` (action move : propagation best-effort des liens).
+- **Effort** : XL · **Risque** : Élevé (Dashboard ne suit pas le backbone aujourd'hui) → mitigé par double-lecture pendant transition (`state.cards` ET blocs lus en parallèle, on ne supprime `state.cards` qu'après validation) + layout séparé de la donnée.
+- **Avant** : Phases 1-6 ; **C203** pour la montée en charge Eagle ; **C205** en parallèle (jamais bloquant).
+
+---
+
+## 9. Nouvelles cartes roadmap à ajouter
+
+Format court `id — titre`. Les épopées C210-C215 existent déjà comme en-têtes (PROGRESS l.406) ; voici leur découpage exécutable.
+
+**Design (C213)**
+- C213a — Tokens Liquid Glass dans index.html + body gris Finder
+- C213b — theme.js : sous-objet glass, glassPanel(), selection, windowBg
+- C213c — Appliquer verre au chrome (sidebar, onglets, toolbar) + hairlines 0.5px
+- C213d — Fallback @supports + prefers-reduced-transparency/motion
+
+**Backbone (C210)**
+- C210a — node.js : type dérivé du chemin (TYPE, typeOfPath, baseOfPath)
+- C210b — buildNodes.js : buildTree/entriesOf type-aware (sur-ensemble legacy)
+- C210c — Extraire Pages() à l'identique dans son fichier (commit isolé)
+- C210d — registry.jsx + NodeRenderer (dispatch unique, remplace ternaires)
+- C210e — Harmoniser signatures renderers (page/db/media)
+
+**Zoom (C212)**
+- C212a — Slider de zoom sur la grille icons (auto-fill minmax)
+- C212b — Tuiles image en couverture directe (bypass PageThumb)
+
+**Eagle (C211)**
+- C211a — QuickLookOverlay multi-type + flèches + préchargement
+- C211b — Espace étendu aux images/médias
+- C211c — Bloc eagle dans .props.json + uploadImageAsCard
+- C211d — Index agrégé .zr-eagle-index.json (perf)
+- C211e — EagleInspector (notes/tags/rating/url/export) + useProps extrait
+- C211f — Drop d'image silencieux (movePage sans confirm pour images)
+- C211g — Dimensions w/h dans .media.json (chunked + api/media)
+- C211h — Vues système (All/Uncategorized/Untagged/Recently/Random)
+- C211i — Smart Folders (.zr-eagle.json + applySmart)
+- C211j — Bouton Réindexer (reconstruire index depuis .props.json)
+
+**Refonte IA / Sidebar (C215)**
+- C215a — Contexte de section + createNav.js (appView/section/layout)
+- C215b — CreateShell : dispatch des sections
+- C215c — Sidebar 3 zones (Create / Apps / Système)
+- C215d — Migration localStorage des view au boot (table de mapping)
+- C215e — Replier Bases/Galerie/References/Projects/Freelance/Archive en sections
+- C215f — Breadcrumbs préfixés section + onglets {view,section,folder,path}
+
+**Canvas Dashboard (C214)**
+- C214a — state.canvas (couche layout, rétrocompatible)
+- C214b — Canvas.jsx draggable (pointer events, debounce 300ms)
+- C214c — Home en section canvas + WeekCalendar déposable
+- C214d — Fullscreen-app (Tab masque chrome, Esc ressort)
+- C214e — linkIndex.js + CreateContext + BroadcastChannel
+- C214f — Liaison carte↔page (pageRef) + « Apparaît dans » dans PropertiesBlock
+- C214g — Propagation best-effort des liens au renommage (api/page move)
+
+**Dépendances externes (existantes, à séquencer)**
+- C205 — Finaliser ffmpeg.wasm (parallèle, jamais bloquant)
+- C203 — Drive Dashboard repos privés (avant montée en charge Eagle)
+- C201 — Montée en charge Eagle 100 → 115k (après C203)
+
+---
+
+## 10. Addendum — corrections de la relecture adversariale (2026-05-31)
+
+La relecture a trouvé des trous réels. Décisions tranchées qui **priment sur les sections ci-dessus** en cas de contradiction :
+
+### Décisions normatives
+- **D1 — Image = `.md` + twins, PAS `.img.json`.** Contradiction §3.2 vs §4.1 tranchée : tout reste `.md` + `.props.json` (move/trash marchent déjà). Le `.img.json`/`.embed.json`/`.canvas.json` ne sont PAS introduits comme types de fichiers tant que le backend move/delete ne les route pas. `isImage` vient du bloc `eagle.kind` dans `.props.json` (via l'index), pas d'une extension.
+- **D2 — L'index `.zr-eagle-index.json` est un CACHE DÉRIVÉ, jamais une source.** Source de vérité = les `.props.json` individuels (atomiques, zéro contention). L'index est régénéré (boot/scroll/bouton Réindexer), jamais réécrit d'un bloc, jamais source. Sharder par dossier. Supprime le risque de 409 silencieux et d'entrée fantôme au move. Retirer « même pattern que .zr-tags.json ».
+- **D3 — `usedAt` PAS à chaque ouverture** (write-amplification) : mémoire seule ou batch fin de session.
+- **D4 — `linkIndex` borné au scope chargé** (hiérarchie + canvas visibles). Jamais de scan global des 4 sources.
+- **D5 — Atomicité move : « par fichier », PAS « par groupe ».** Soit move des twins en UN commit Git (pattern api/media.js commit), soit réconciliation au boot des jumeaux orphelins. Limite existante « pas de move de sous-arbre » (movePage) impacte Phases 6/7 — à lever (move récursif backend) ou cadrer.
+- **D6 — Migration localStorage = changement de shape, défaut sûr.** view inconnue → create racine (jamais throw) ; écrire la nouvelle clé À CÔTÉ de l'ancienne (rollback) ; ne pas écraser avant succès.
+
+### Nouvelle PHASE BACKEND (avant Phase 1) — BLOQUANTE
+Étendre `api/page` move/delete/twins + `entriesOf`/`buildTree` aux suffixes retenus, fixer le flag `truncated`, lister chaque extension explicitement. « Backend INCHANGÉ » (§2.5) et « via api/page move atomique » (§8) étaient FAUX. 
+Déjà fait : filtre `tree` élargi (api/page.js NODE_RE) ; `loadTree` surface `truncated` (App.jsx).
+
+### Quick wins (faits / à faire)
+- ✅ QW1 fix `truncated` ignoré (App.jsx loadTree).
+- ✅ QW3 filtre `tree` élargi.
+- Phase 0 requalifiée **S** (verre déjà à ~70% : theme.glass + glassPanel + sidebar). Reste onglets + toolbar.
+
+### Perf normative (Phase 6)
+- Virtualisation OBLIGATOIRE (masonic, déjà dans Gallery.jsx) dès ~200 tuiles ; `content-visibility:auto` hors écran ; `PageThumb` lit l'URL depuis l'index/manifest, jamais re-fetch markdown par tuile ; AUCUN `backdrop-filter` sur élément qui scrolle (chrome sticky uniquement).
+- Quick Look média : fallback `video.canPlayType` → état « format non lisible » explicite, jamais de cadre noir.
+
+### Méthode
+Ancrer les phases sur des SYMBOLES (`function Pages`, `movePage`, `PageThumb`), pas des numéros de ligne (ils pourrissent au 1er commit).
+
+---
+
+## 11. État d'exécution — PLAN FINI (v1) au 2026-05-31
+
+Les 8 phases du master plan sont implémentées à leur périmètre v1, buildées, poussées et vérifiées au navigateur (smoke test : 9 vues basculent sans erreur console, zéro régression).
+
+- **Phase 0 — Design Liquid Glass** ✅ tokens CSS, body gris Finder, theme.glass + glassPanel(), verre sur sidebar/onglets/toolbar, fallback @supports + reduced-transparency.
+- **Phase 1 — Backbone unifié** ✅ src/create/node.js (type dérivé) + buildNodes.js (sur-ensemble), App délègue.
+- **Phase 2 — Dispatch par type** ✅ renderers centralisés sur typeOfPath.
+- **Phase 3 — QuickLook** ✅ QuickLookOverlay plein écran (Espace) multi-type + flèches.
+- **Phase 4 — Eagle metadata** ✅ bloc eagle (.props.json source unique), EagleInspector, index DÉRIVÉ borné au dossier, couvertures directes, drop silencieux, vues système, w/h à l'upload, Réindexer.
+- **Phase 5 — Smart Folders** ✅ moteur applySmart + UI (créer/appliquer/supprimer, .zr-eagle.json).
+- **Phase 6 — Repli dans Create** ✅ createNav.js (modèle appView/section/layout + migration défaut sûr), sidebar 3 zones (Create/Apps/Système), CreateShell barre de sections unifiée (Fichiers/Dashboard/Bases/Galerie/References/Projects/Freelance/Archive). Documents+Trash séparés, Articles séparé (décision §3.3).
+- **Phase 7 — Canvas Dashboard** ✅ mode Canvas draggable (DraggableBlock pointer events, positions persistées), 6 blocs déplaçables, toggle.
+
+**Périmètre explicitement reporté (roadmap, conforme au §2.3 du plan)** : watcher universel de liaison bidirectionnelle (DB↔gallery↔pages temps réel) ; persistance du canvas en state GitHub plutôt que localStorage (layout per-device en v1) ; virtualisation masonic des grilles >200 tuiles (à activer à la montée en charge Eagle, gated C203) ; finalisation ffmpeg.wasm mkv (C205) ; import Eagle 115k (C201, gated C203 Drive Dashboard).
+
+Non-régression respectée : extraction par sur-ensemble, ajouts non-destructifs, anciens composants conservés, builds verts à chaque étape.
+
+## 9 October 2026 : C209, suffixes de nœuds et arbre complet
+
+- 9 October 2026 : `server/extensionsNoeuds.js` est la source canonique des onze types visibles ; `tree`, `children`, `buildTree` et la recherche partagent le même filtre, dont `.comment.json`.
+- 9 October 2026 : `move`, `move-batch`, copie, corbeille, restauration et purge partagent les mêmes paires de déplacement et les trois jumeaux des pages Markdown ; `delete` reste une suppression exacte du chemin donné.
+- 9 October 2026 : l'API expose le drapeau `truncated` ; les dossiers utilisent leur sous-arbre avec repli par descente dossier par dossier, tandis que les fonctions globales réunissent l'arbre frais avec l'index CDN complet.
+- 9 October 2026 : preuve locale : 1 995 tests passent, un test est ignoré, les 52 tests ciblés passent après le dernier ajout et `npm run build` réussit.
+- 9 October 2026 : l'endpoint réel est `server/page.js`, et la réponse JSON de `action=tree` conserve explicitement `truncated`; les anciennes mentions `api/page.js` restent l'historique du plan.
+
+## 9 October 2026: C210c, extraction de Pages()
+
+- 9 October 2026: `src/create/Pages.jsx` contient `Pages()` et ses composants dépendants ; les corps déplacés gardent leur logique.
+- 9 October 2026: `src/App.jsx` importe `Pages`, `BIBLIOTHEQUES`, `Markdown`, `NodeThumb` et `pagesMonte`, les seuls liens encore utilisés hors du module.
+- 9 October 2026: `npm run build` réussit ; la suite complète compte 204 fichiers de test réussis, 1 995 tests réussis et 1 ignoré.
+- 9 October 2026: C210d reste en cours et C210e reste à faire ; C210c précède ces deux étapes.
+
+## 9 October 2026: C210d, registre de rendu
+
+- 9 October 2026: `src/create/registry.jsx` centralise les types, icônes, extensions, actions, Quick Look et composants de rendu.
+- 9 October 2026: `Pages.jsx` utilise un seul NodeRenderer ; musique et écoute rapide gardent leurs branches métier, et les fichiers inconnus gardent leur éditeur de repli.
+- 9 October 2026: `UnifiedViewer.jsx` reste le point d’entrée historique ; `ResolvedUnifiedViewer.jsx` conserve la résolution Eagle uniquement pour images, médias, archives, boards, embeds et tables.
+- 9 October 2026: Suite complète après la correction Eagle : 207 fichiers de test, 2 003 tests réussis et 1 ignoré ; `npm run build` réussit.
+- 9 October 2026: Commit `0494f146` poussé sur `origin/main`, déployé par Wrangler en Production/main sous `d3bdc21a`.
+- 9 October 2026: À 09:29 CEST, HTML, CSS, JavaScript principal et chunk du registre répondent HTTP 200 et correspondent octet pour octet à `dist`.
+- 9 October 2026: À 09:39 CEST, Wrangler confirme toujours Production/main source `0494f14` ; le JavaScript et le CSS conservent leurs empreintes initiales.
+- 9 October 2026: Le contrôle différé de C210d passe avant le déploiement suivant.
+
+## 9 October 2026: C210e, contexte commun des renderers
+
+- 9 October 2026: Les renderers page, base et média partagent le contexte `{t, path, title, paths, onOpenPage}` ; les lecteurs spécialisés gardent leurs interfaces métier internes.
+- 9 October 2026: `Pages.jsx` fournit ce contexte au renderer page, qui le transmet à `PropertiesBlock` et `PageEditorBN` sans changer le comportement d’ouverture.
+- 9 October 2026: Suite complète verte : 207 fichiers, 2 004 tests réussis et 1 ignoré ; `npm run build` réussit.
+- 9 October 2026: Commit `029923fa` et la note `5409fbd5` sont sur `origin/main` ; Production/main déploie `c5faf638` depuis `5409fbd`.
+- 9 October 2026: À 09:41 CEST, HTML, bundle principal, CSS et chunk du registre répondent HTTP 200 et correspondent octet pour octet à `dist`.
+- 9 October 2026: À 09:51 CEST, le contrôle différé passe : Wrangler confirme Production/main depuis `5409fbd`, le site répond HTTP 200, et le HTML ainsi que les empreintes JavaScript `57c4dfbfd3d90f04c4a84f090c247e7c4f421ff506c54e466b6f005017bdf643` et CSS `06436c429c0f5dcd5d6be7ac4571228c03e05e7c581d28b1708b821bdd028a8f` restent identiques à `dist`.
+
+## 9 October 2026 : T6.6, catalogue Assets compact
+
+- 9 October 2026, 10:25 CEST : Le navigateur lit un petit index de résumés, puis le détail frais du projet sélectionné ; il ne télécharge plus les listes de fichiers de tous les projets.
+- 9 October 2026, 10:25 CEST : Le publisher migre le grand registre une fois si l’index manque, puis garde l’ancien fichier en lecture seule ; un index invalide ou une panne réseau reste une erreur visible.
+- 9 October 2026, 10:25 CEST : Tests ciblés couvrent le résumé sans chemins privés, la compatibilité de migration, les conflits Git et le cache CDN du détail sélectionné.
+- 9 October 2026, 10:25 CEST : La preuve cloud reste à faire après les archives en cours ; au contrôle, `zenray-assets-v2` a un job d’archive actif et deux autres projets ont des jobs en file.
+- 9 October 2026, 10:25 CEST : Prochain geste : attendre une file Assets entièrement inactive, recharger le service, publier, puis vérifier SHA, tailles et données de l’index distant.

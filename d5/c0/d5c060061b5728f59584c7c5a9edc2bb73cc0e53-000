@@ -1,0 +1,189 @@
+# ZenRayProgress — PLAN
+
+Feuille de route vivante. But : remplacer Notion + Miro + une drive infinie, **centré sur les objectifs de Matthieu**. App complète, hyper pro, hyper clean, avec toute sa vie dessus. On avance par cartes, dans l'ordre, on ne lâche jamais.
+
+Statuts : ✅ fait · 🔶 en cours · ⬜ à faire · ⛔ bloqué
+
+---
+
+## 🗂️ CHANTIER ACTUEL — suivi visuel (mis à jour 9 October 2026)
+
+Lis CE bloc en premier. C'est l'état réel du chantier, dans l'ordre où on dev.
+
+| # | Carte | Statut | Note |
+|---|-------|--------|------|
+| C0 | **Bug arbre Notion** : page = contenu + sous-pages dans LE MÊME nœud | ✅ | Fusion `X.md` + `X/`. Clic = ouvre toujours l'éditeur. Liste des sous-pages sous l'éditeur. Auto-expand des ancêtres. |
+| C1 | **Backbone de vues unifié** : Dashboard / Create / Archive / Documents / Freelance / Gallery / Projects = MÊME code, switcher de vue partout | 🔶 | Vues `Tile-Gallery` / `List` / `Page`. Inspiré Mac OS Finder + Notion. Media img/vidéo embed qui s'affiche. Gallery sépare la sélection manuelle des images locales sauvegardées dans le cloud, consultables par dossiers avec fil d’Ariane (9 October 2026). |
+| C2 | **Drag-and-drop création de tuile** | ⬜ | Créer/déplacer une tuile-page dans l'arbre et dans les vues. |
+| C3 | **Onglet References** (Eagle 110k AVIF) | ⬜ | Indexé petit à petit. Galerie virtualisée comme Gallery. Repo d'assets dédié avant l'import 110k. |
+| C4 | **Onglet Audio** (Spotify 1:1 + MusicBee + SFX gallery) | ⬜ | Front Spotify 1:1, logique MusicBee. Musiques cloud GitHub. Test via samples sfx/bgm `yt-dlp`. Continuité du code Notion-like mais qui gère la musique. |
+| C5 | **Transclusion inline** (rendre le contenu d'une page dans une autre) | ⬜ | Bloc BlockNote custom. Refinement de l'embed drag-drop déjà fait. |
+| C6 | **Import media.zip** (8,7 Go) — déjà fait partiellement | ✅ | 1778 pages + 60 bases + 5187 webp. Re-vérif 0 perte = ⬜. |
+| C7 | **Audit 2026-07-15 — refactor sécurisé, Music fiable et chrome Liquid Glass** | 🔶 | Exécution séquentielle des 131 constats généraux puis des 46 constats Music/UI, par lots réversibles avec tests et revue adversariale. |
+| C209 | **Phase backend OS, suffixes de nœuds, déplacement, corbeille et troncature** | ✅ | Les onze types partagent un registre, leurs déplacements et jumeaux sont couverts, et l’index complet complète l’arbre Git tronqué (9 October 2026). |
+| C210 | **Backbone commun Create, Notion et Finder** | ✅ | C210d et C210e sont publiés sur Production/main ; C210e passe aussi le contrôle des dix minutes, avec HTML, JavaScript et CSS identiques à `dist` (9 October 2026). |
+| C100 | **Sport** : base d'exercices en tuiles, carte Plan unique par jour, note du jour, objectif visuel, séance passée | ✅ | 16 October 2026. Vue `sport`, `docs/SPORT.md`, 19 tests. |
+| C998 | **Repos `.claude` et `Memory` consultables dans l'app** | ⬜ | PRIORITÉ 998 (avant-dernière). Read-only au minimum (ne casse rien, les repos sont déjà sur GitHub). Étudier read+edit avec PRUDENCE : un push modifie les fichiers que le Mac lit en local → risque de casse. Réutilise le backbone (Documents fait déjà Memory partiellement). |
+| C99 | **Ask Claude (IA)** | ⛔ | PRIORITÉ 999, écartée mais PAS oubliée. Nécessite clé API Anthropic. |
+
+**Règle de chaque carte** : build-verify → commit → push → deploy Vercel → MAJ ce tableau + PROGRESS.md. Jamais casser l'existant. Sobre en tokens.
+
+---
+
+## Vision
+
+Une unité unique et vivante : objectifs (LifeOS) + agenda + pages type Notion + bases de données + IA + drive GitHub infinie + portfolio + mémoire. Source de vérité unique, zéro données éparpillées. Icône = silhouette Notion avec le Z de ZenRay.
+
+## Architecture
+
+- **Front** : Vite + React 18, déployé Vercel (https://zenray-progress.vercel.app), DA reprise de ZenRayWebsite (fonts Anthropic + GT Super Display, coral→rose #F38A5C→#E27687, thème blanc uniforme).
+- **Serverless** (`/api`) : `state` (progression), `doc`+`tree` (lecture live repo Memory), `page` (CRUD pages markdown), `img` (héberge/sert images), `upload` (assets), tous via `GITHUB_TOKEN` (classic, sans expiration).
+- **Sources de données** :
+  - objectifs → `Memory/LifeOS/objectives.json`
+  - documents → repo `Memory` (privé, lecture live)
+  - pages + images → repo `zenray-content` (privé, drive permanente lecture/écriture)
+  - projets → `ZenRayWebsite` / matthieuhuguet.com (live)
+  - progression UI → localStorage (+ Upstash cross-device à brancher)
+
+## Features
+
+### Socle
+- ✅ Tableau objectifs (119 obj, % par domaine, séquence de cartes, X/Y/Z)
+- ✅ Agenda hebdo drag-and-drop (cartes datées, panneau Notion à droite)
+- ✅ Archive des cartes par mois (format "26 Juin 2026")
+- ✅ Projects (22 projets liés depuis ZenRayWebsite, lecture seule)
+- ✅ Documents (lecture live du repo Memory + parcourir tout l'arbre)
+- ✅ Freelance dashboard (iframe legacy)
+- ✅ Sidebar de navigation + thème clair/sombre (blanc uniforme par défaut)
+- ✅ Icône Z (silhouette Notion + Z ZenRay)
+
+### Pages (cœur Notion)
+- ✅ Créer / éditer / supprimer des pages markdown, persistées sur GitHub (drive `zenray-content`)
+- ✅ Éditeur 3 modes (Éditer / Split / Aperçu), Cmd+S
+- ✅ Markdown riche : H1/H2/H3, listes, quotes, code, tables, **task lists**, séparateurs (marked GFM)
+- ✅ Lien entre pages `[[slug]]` (clic → ouvre l'autre page)
+- ✅ Images drag-drop dans les pages (webp 95%, hébergées dans la drive privée, servies via proxy `/api/img`)
+- ⬜ Embed transclus (rendre le contenu d'une autre page inline, pas juste un lien)
+- ⬜ Toggles / callouts / boutons en blocs dédiés (au-delà du HTML brut)
+- 🔶 Éditeur par blocs type Notion = **BlockNote** (MPL-2.0). Sprint 1 ✅ (socle isolé, vue « Éditeur » beta, fonts Anthropic, lazy-load). Bascule des Pages au sprint 3. Roadmap 8 sprints détaillée dans `docs/ARCHITECTURE.md`.
+
+### Bases de données
+- ⬜ Tables / boards stockés en JSON dans la drive, vues filtrables (le 2e pilier de Notion)
+
+### IA
+- ⬜ Génération de contenu via Claude directement sur le site (article custom live) — nécessite clé API Anthropic
+
+### Drive / Médias
+- ⬜ Images hébergées proprement (repo public d'assets ou proxy) + compresseur webp 95% (proxy fait)
+- ⬜ Galerie Eagle 110 000 AVIF consultable sur le web (manifest + stratégie CDN/repo)
+- ⬜ Import des exports Notion **Build** (`build.zip` 2,5 Go, ~9684 entrées) PUIS **Media** (`media.zip` 8,7 Go, source #2, zip imbriqué `ExportBlock-528a1ed1…`, mappée **à l'identique** et mise **à la suite**, ordre préservé) → rangés dans la drive. EN DERNIER (sprint 8), après l'app finie.
+
+### Build Dashboard & idées
+- ✅ **Build Dashboard / Chantier** (PRIORITÉ) : vue live de la construction du site — fait/en cours/à faire, barre de progression, ajout de tâches en GUI, persisté dans la drive (`build/tasks.json`). Fait.
+- ⬜ **Corbeille (trash)** pour pages / images / media supprimés, sur tout le site — à faire après l'architecture page-embed
+- ⬜ **Auto-publication réseaux** : éditer sur le site (éditeur custom) puis push direct sur **Instagram / LinkedIn / YouTube**
+
+### Transversal
+
+- ⬜ Décision public vs privé du site (actuellement privé, login Vercel)
+- ⬜ Révoquer l'ancien PAT fine-grained (remplacé par le classic sans expiration)
+
+## Séquence (cartes, dans l'ordre)
+
+1. ✅ INCR.1 — icône Z, Pages markdown persistées, thème blanc
+2. ✅ INCR.2 — markdown riche + liens entre pages + images hébergées
+2b. 🔶 NOTION-LIKE (8 sprints, voir docs/ARCHITECTURE.md) — Sprint 1 ✅ socle BlockNote · Sprint 2 ✅ persistance jumelle · Sprint 3 ✅ Pages sur BlockNote · Sprint 4 ✅ lien/mention de page + navigation · Sprint 5 ✅ bases de données vue Table (onglet Bases). Sprint 6 ✅ DB vues Board/Gallery/List · Sprint 7 ✅ galerie images virtualisée (Masonic + /api/img avif + cache edge). App Notion-like cœur COMPLET. Reste optionnel : relations entre bases (6b), transclusion inline (4b). Sprint 8 (import zips) = sur feu vert.
+- Freelance : iframe legacy REMPLACÉ par un tracker de candidatures NATIF (freelance/applications.json). freelance-mh.vercel.app = deprecated. Asobo (Level Designer) postulé le 29/05/2026. Stack : BlockNote, TanStack Table + dnd-kit, Masonic, papaparse+remark. React 19.
+2c. ✅ Build Dashboard (Chantier) — priorité, fait (vue live + GUI d'ajout de tâches, persisté drive)
+3. ⬜ INCR.3 — import + rangement Build (build.zip 2,5 Go) PUIS Media (media.zip 8,7 Go), à la suite ; EN DERNIER, sprint 8
+8b. ⬜ Corbeille globale (trash) — après page-embed
+9. ⬜ Auto-publication réseaux (IG/LinkedIn/YouTube) — éditeur custom + push direct
+4. ⬜ INCR.4 — bases de données (tables/boards)
+5. ⬜ INCR.5 — intégration IA (création de contenu via Claude)
+6. ⬜ INCR.6 — galerie Eagle 110k AVIF sur le web
+7. ⬜ transversal — Upstash, assets publics, public/privé
+
+## Priorité vie (ne jamais oublier, hors outil)
+
+Avant le 12 juin : **1er contrat freelance** (finance le Japon) + **japonais N5**. L'outil sert les objectifs, il ne les remplace pas.
+
+---
+
+## Vision originale (verbatim, Matthieu — à ne jamais perdre)
+
+> Passer Notion sur ZenRayProgress. Pouvoir interagir sans MCP, ranger les choses plus facilement. Sur Notion c'est vite le bordel et tu ne peux pas faire 100% de ce que tu veux (Miro + Notion + Drive infini…). Avoir l'intégration AI directement sur ce propre site qui permettrait de faire 100% de ce que je veux. Imaginer la création d'un article customisé, live directement sur le site ZenRay.
+>
+> Une forme de drive GitHub infinie puisque je peux tout stocker : à terme mettre ma galerie EAGLE 110 000 fichiers AVIF directement consultable sur le web. Faire la passerelle et la drive directement. Avoir plus de contrôle.
+>
+> Thème blanc plus uniforme (prise de note + calendrier). Prendre toutes ces améliorations, ensuite je donnerai 100% de mes fichiers Notion Build et Media (en cours d'export) à ranger proprement après.
+>
+> Prendre la doc de Notion et développer 100% des features de Notion directement sur ce site : mémoire permanente, AI integration pour créer des choses via MCP Claude Code, création d'une page qui embed une autre page (la base de Notion), texte h1/h2/h3 et tout le markdown, boutons, database. Travail colossal mais but = centraliser autour de mes objectifs, créer l'unité parfaite. Icône = SVG original de Notion pivoté à l'intérieur pour faire un Z (le Z de ZenRay). App complète, hyper pro, hyper clean, avec toute ma vie dessus + Memory Link.
+>
+> Life Objectif ZenRay Progress Dashboard. Aller jusqu'au bout de ce projet, ne jamais abandonner.
+
+**Contraintes d'exécution (sprint Notion-like) :**
+- Assembler 80% de code open-source existant **légitime** (MIT/Apache : éditeurs blocs type BlockNote/Novel/Tiptap, libs de tableaux/boards, parseurs d'export Notion). Pas de code piraté / "copies" douteuses. Coder seulement ~20% de glue pour relier les fonctions vitales.
+- Minimalisme et interface **1:1 Notion**. UX/UI impeccable, fluide, peu importe la taille de l'app.
+- Fonts front : **80% Anthropic Serif, 15% Sans, 5% Mono** (Mono = chiffres et maths uniquement).
+- Images : conversion **webp dynamique automatique**, lazy + virtualisation pour afficher énormément d'images sur une page sans lag.
+- **Petits sprints**, vérifier constamment, ne jamais casser l'existant, commit progressif, dossier source propre.
+- Import du `build.zip` (Notion Build, 2,5 Go, zip imbriqué `ExportBlock-*.zip`) : pages + databases + images + CSV. **Seulement une fois l'app Notion-like finie**, rangé en respectant l'ordre actuel. Média viendra ensuite (plus complet).
+
+---
+
+## Backlog complet (demandes Matthieu, 2026-05-29) — à dev SÉQUENTIELLEMENT, boucle jusqu'à parfait
+
+Objectif global rappel : Notion 1:1, minimaliste, UX/UI impeccable, sur TOUT le site (pas un seul espace). Pages en anglais. Icônes moches supprimées. Hébergement = GitHub `zenray-content` (privé, <100 Mo/fichier, croissance infinie : à terme 110k screens + musiques).
+
+Statuts : ✅ fait · 🔶 en cours · ⬜ à faire
+
+### Import / données
+- ✅ Import Build texte sans perte (6019 pages namespace `pages/Build/`, 290 bases `databases/build-*`), navigation arbre
+- ✅ Médias Build → webp (3033 fichiers, 458 Mo) dans media/, liens images réécrits, servis via /api/img (proxy)
+- ⬜ Import `media.zip` (8,7 Go) namespace `Media/` — séparé de Build
+- ⬜ Re-vérifier 0 perte (8 collisions résiduelles quasi-identiques)
+
+### UI / design Notion (sur TOUT le site)
+- ✅ Nav anglaise sans icônes, Roadmap (ex-Chantier), Create (ex-Pages)
+- ✅ Éditeur en SPLIT (arbre gauche / éditeur droite)
+- ✅ Hover propre nav/arbre + transitions (1re passe UI Notion)
+- ⬜ Reprendre l'UI Notion 1:1 (espacements, typo, menus, cartes minimalistes) partout
+- ⬜ Create = Build et Media séparés, arborescence propre + drag-and-drop dans l'arbre
+
+### Features Notion essentielles
+- ✅ Embed page-dans-page par DRAG-AND-DROP (page de l'arbre Create -> lien-embed cliquable). Transclusion inline rendue = refinement.
+- ✅ **Calendar** : vue calendrier sur les bases de dates (détection colonne date, grille mois)
+- ✅ **Commentaires** sur les pages (drive <page>.comments.json)
+- ⛔ **Ask Claude** : BLOQUÉ — nécessite clé API Anthropic (ou bridge). En attente de Matthieu.
+- ⬜ Cartes Notion minimalistes (tuiles)
+- ⬜ Corbeille (trash) pages/images/media
+- ⬜ Auto-publication Instagram/LinkedIn/YouTube (éditeur custom + push)
+
+### Transversal
+- ⬜ Upstash (progression cross-device), relations entre bases (6b)
+
+## Priorités mises à jour (2026-05-29)
+- Ask Claude (IA) = DERNIÈRE priorité (après tout le reste). MAJ Roadmap + visuel quand on y arrivera.
+- ✅ Import media.zip : 1778 pages (pages/Media/) + 60 bases (databases/media-*) + 5187 images webp (517 Mo). Drive zenray-content ~1,4 Go (NB: avant l'import Eagle 110k, passer les médias sur un repo d'assets dédié).
+- ⬜ PASSE FIDÉLITÉ NOTION (d'après screenshots Matthieu) — PRIORITAIRE : icônes/emoji de page dans l'arbre + titre ; bloc propriétés en tête de page (Parent/Sub-item/Add property) ; colonne de contenu centrée + aérée ; vue LISTE des bases datées (entrées par date, comme le calendrier Notion) ; espacements/typo Notion 1:1 sur tout le site ; commentaires en tête comme Notion.
+
+## RÈGLE VISUELLE PERMANENTE (ne jamais oublier)
+- Fonts : **Anthropic Serif 80%** (contenu, titres, corps) · **Anthropic Sans 15%** (chrome UI : nav, boutons, menus, toolbar) · **Anthropic Mono 5%** (chiffres, maths, code uniquement). JAMAIS Inter ni police par défaut. (BlockNote importait Inter → retiré + override CSS .bn-editor en Serif.)
+
+## P1 PERFORMANCE + T6-T10 (2026-06-01) — workflow lancé
+
+Objectif : fluidité Finder native. Deletion/Creation/Move/Research/Image actuellement 3-5 s → cible perçu instantané.
+
+| # | Tâche | Cause racine | Solution | Statut |
+|---|---|---|---|---|
+| P1a | Navigation lente | loadDir = AR GitHub à froid, 0 cache | Couche cache SWR (cache instantané + revalidation background) | ⬜ |
+| P1b | Create/Delete/Move lents | loadPaths() = arbre git récursif ~10Mo après chaque op | Optimiste partout + mutation cache local + loadPaths sorti du chemin critique | ⬜ |
+| P1c | Images re-téléchargées | /api/img max-age=0 + cache RAM seul | Cache IndexedDB persistant + max-age long (hash=immuable) | ⬜ |
+| P1d | move-tree lent | walk Contents séquentiel serveur | walk parallélisé | ⬜ |
+| T6 | Recherche scoring/incrémental | index 11Mo refetch, 0 scoring | index caché client IndexedDB + scoring préfixe/nom>contenu + incrémental | ⬜ |
+| T7 | Audit complétude Excel 1:1 | — | audit + combler écarts vs Sheets | ⬜ |
+| T8 | Audio vérif complète | — | lecture wav/mp3/flac + fluidité bout-en-bout | ⬜ |
+| T9 | Eagle image pleine instantanée (Espace) | — | QuickLook image pleine sur Espace | ⬜ |
+| T10 | Drive automation repo/taille | — | revue création repo + gestion taille | ⬜ |
+
+Exécution : audits 6 agents parallèles (~120k tok), impl séquentielle monolithe (~260k tok), total ~380k, ~30 min.

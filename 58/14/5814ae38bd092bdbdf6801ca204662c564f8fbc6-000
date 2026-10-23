@@ -1,0 +1,35 @@
+# ZenRayShards
+
+**Définition.** Stockage adressé par contenu : n'importe quel fichier est découpé en parts de 95 Mo, poussées sur des dépôts GitHub publics, et recollées **bit à bit** dans le navigateur. Le CDN = le disque ; le manifeste = la table des parts ; le navigateur = le contrôleur qui réassemble par plage d'octets.
+
+## Comment ça marche
+
+- **Découpe.** Le fichier original est lu en flux et coupé en parts de 95 Mo (sous la limite 100 Mo/fichier de GitHub). Chaque part est nommée par son empreinte **SHA-256** (`ab/cd/<hash>.bin`) → déduplication automatique, aucun nom humain exposé.
+- **Stockage.** Parts poussées sur des dépôts publics `zenray-blob-public-NN`, servies par `raw.githubusercontent.com` (limite 100 Mo/fichier, pas 20 Mo comme jsDelivr). **Shards infinis** : rollover automatique à 4 Go par dépôt (marge sûre sous la limite 5 Go de GitHub), nouveau dépôt vide créé à la volée → **aucun reclonage**.
+- **Manifeste.** Un `.file.json` (type `blob-raw`) liste les parts avec offsets cumulés + tailles + empreinte par part, plus la taille totale et le mime.
+- **Reconstitution.** Au téléchargement, le navigateur tire les parts dans l'ordre et les concatène → fichier **identique à l'original, octet pour octet**. Aucune perte, aucune transformation.
+
+## Bit à bit exact vs streamable
+
+- **Fichiers quelconques (`ingestBlobRaw` → `.file.json`)** : aucune transformation → **bit à bit exact** (wav, mp3, pdf, docx, zip, glb, 3D, code…).
+- **Vidéo (`ingestVideoRaw` → `.media.json` type `video-raw`)** : même découpe 95 Mo, mais **faststart remux** d'abord (l'atome `moov` est déplacé en tête → lecture qui démarre dès la 1re part via un Service Worker range-shim). Conséquence : la vidéo n'est **pas** bit-à-bit identique (octets réordonnés, métadonnées propriétaires DJI jetées). C'est le compromis pour le streaming instantané. Le mode bit-exact reste disponible si on veut archiver une vidéo sans la streamer.
+
+## Aperçu sur le site (selon le type)
+
+Reconstituer marche pour tout ; **afficher** dépend du décodeur :
+
+| Type | Reconstituer | Aperçu en ligne |
+|---|---|---|
+| wav / mp3, pdf, image, texte/code | ✅ | ✅ (déjà : `<audio>`, `<iframe>`, `<img>`, texte) |
+| docx / xlsx / pptx, epub, glb/3D, zip | ✅ | ⚠️ décodeur JS dédié à brancher (mammoth.js, epub.js, three.js…) |
+
+## Pourquoi c'est une primitive réutilisable
+
+« Héberge et streame n'importe quel fichier, gratuitement, sur GitHub, reconstitué dans le navigateur. » C'est un actif autonome (lib open-source potentielle) : content-addressed chunking + réassemblage client par plage d'octets, sans serveur de stockage.
+
+## Fichiers clés
+
+- `Scripts/video-raw-lib.mjs` : `makeVidRawShardCtx({ base, startShard })` (shards, rollover, push) + `ingestBlobRaw` (bit-exact) + `ingestVideoRaw` (faststart streamable).
+- `Scripts/upload-blob-all.mjs` : runner walk-all « autres fichiers ».
+- `public/zr-stream-sw.js` + `src/lib/vidStream.js` : Service Worker range-shim (vidéo).
+- `src/components/QuickLookOverlay.jsx` : aperçu reconstitué (`.file.json`).

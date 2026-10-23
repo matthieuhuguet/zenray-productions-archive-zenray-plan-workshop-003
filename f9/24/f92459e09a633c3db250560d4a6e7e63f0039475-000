@@ -1,0 +1,132 @@
+# ZenRayProgress — Architecture finale (document de référence unique)
+
+État figé au 2026-07-04, avant mise de côté du projet. Ce document remplace la lecture de tous les autres docs pour comprendre le système dans son ensemble ; les docs `docs/*.md` individuels restent en archive détaillée par sujet.
+
+## 1. Vue d'ensemble
+
+ZenRayProgress est une SPA React/Vite façon Google Drive/Finder macOS : navigation par dossiers, tuiles, drag&drop, aperçus riches (image, vidéo, audio, PDF, 3D, documents). Aucun serveur de stockage propriétaire — **GitHub sert de backend** (repos = disques durs, commits = écritures, API GitHub/jsDelivr = lecture). Déployé sur Vercel (fonctions serverless + hosting statique), domaine `zenray-shards.vercel.app` (alias historique conservé : `zenray-progress.vercel.app`, aucune casse pour les liens déjà partagés). Le dev local tourne via `Scripts/local-server.mjs` (bind 127.0.0.1 uniquement).
+
+---
+
+## 2. Table de routing média (règle centrale)
+
+| Type de contenu | Destination | Manifeste | Stockage ZenRayShards ? |
+|---|---|---|---|
+| Musique | Lien YouTube (non répertorié) | `.media.json {type:'youtube', audioOnly:true}` | Zéro octet |
+| Vidéo | Lien YouTube (non répertorié) | `.media.json {type:'youtube'}` | Zéro octet |
+| Images | ZenRayShards (`zenray-img-public-NN`) + CDN jsDelivr | `.img.json` chiffré AES-GCM | Oui — si source >20 Mo : remux AVIF CRF25 (gain ~88%, validé empiriquement) puis sharding en morceaux, quelle que soit la taille finale post-compression |
+| Documents, `.db.json`, `.file.json` (archives), canvas/embed, **et les images elles-mêmes** | Stockage PRIMAIRE existant (inchangé) | selon type | Oui, **+ second backup redondant** (voir §4) |
+| Liens Google Maps | Intégré inline, zéro stockage | `.media.json {type:'gmaps'}` | Zéro octet |
+
+Principe transversal (documenté dans `youtubeLink.js`/`gmapsLink.js`) : chaque nouveau type de lien reste un `.media.json` **ordinaire**, seul le champ `type` change. Zéro nouveau dispatch à écrire ailleurs — tuile Finder, `/watch`, commentaires par vidéo fonctionnent sans modification.
+
+---
+
+## 3. Inventaire exhaustif des features
+
+### 3.1 Finder / Create (navigation)
+- Arbre de dossiers, tuiles (grid/liste/icônes), drag&drop upload et déplacement, renommage, tags, favoris.
+- Recherche full-index (voir §3.10), sélection multi + ZIP à la volée, Quick Look plein écran (`QuickLookOverlay.jsx`, geste Espace/flèches/Échap, "façon macOS Eagle").
+- Corbeille (`Trash`), dossier vide toléré (Git ne garde pas les dossiers vides — comportement documenté dans PROGRESS.md).
+
+### 3.2 Types de médias `.media.json` — dispatch central
+Fichiers : `src/components/MediaViewer.jsx` (lecteur intégré dans le Finder) + `src/components/QuickLookOverlay.jsx` (overlay plein écran). Discriminant unique : `m.type`.
+
+| `type` | Rôle | Lecteur |
+|---|---|---|
+| `video-raw` | Vidéo chunkée bit-exact (faststart remux), streaming Service Worker range-shim | `src/lib/vidStream.js` + `public/zr-stream-sw.js` |
+| `dash` | Vidéo HEVC/CMAF multi-qualité (360/720/1080/2160p), streaming adaptatif | `dash.js` |
+| `hls` (legacy) | Vidéo HLS `.ts` AES-128 | `HlsVideo.jsx` |
+| `youtube` | Vidéo ou audio hébergé YouTube non répertorié | `VideoPlayer2.jsx` (API YouTube officielle, contrôles maison) |
+| `gmaps` | Carte Google Maps intégrée | `GmapsViewer.jsx` |
+
+### 3.3 Widget audio façon Spotify (`VideoPlayer2.jsx`, mode `isAudioOnly`)
+- Déclenché par `manifest.audioOnly === true` sur un nœud `youtube`.
+- Transport : aléatoire (shuffle, pastille verte), précédent, lecture/pause, suivant, répétition.
+- Navigation entre **pistes sœurs du même dossier** (liste `siblings`, ex. `Music/Lost Odyssey OST/`).
+- Widget compact (pochette carrée + titre/auteur + mini-lecteur), pas de cadre vidéo 16:9.
+- Bouton Télécharger : route serveur **locale uniquement** (jamais exposée en prod Vercel) extrayant un vrai MP3 via yt-dlp (fichier temporaire réel, pas de pipe direct — un pipe direct produisait un WebM déguisé en .mp3).
+
+### 3.4 Images (`.img.json`)
+- Chiffrement AES-GCM 256 bits (`src/media/crypto.js`), clé maître servie par `/api/media-key` (jamais committée, jamais publique).
+- Résolveur : URL jsDelivr pinnée sur commit (immuable) → fetch ciphertext → déchiffrement client → objectURL.
+- Vignettes (`thumbIv` séparé), cache RAM + IndexedDB, lazy viewport (`useInView`).
+- Plein écran via Quick Look. IV déterministe = 12 premiers octets du SHA-256 du clair → dédup GitHub automatique.
+
+### 3.5 Fichiers bruts / archives (`.file.json`)
+- Chunking content-addressed (ZenRayShards, voir §3.11), `Scripts/archive-folder.mjs` (upload bulk d'un dossier local), `archive-organize` (skill : ranger/renommer sans re-upload).
+- Reconstitution bit à bit exacte côté navigateur (pas de perte, pas de transformation).
+
+### 3.6 Databases / Canvas / Embed
+- `.db.json` : `Databases.jsx` + `DatabaseTable.jsx`, modèle JSON façon Notion (propriétés typées, vues table/board/gallery/list), logique TanStack Table + dnd-kit.
+- `.canvas.json` : `CanvasNodeViewer.jsx`.
+- `.embed.json` : `EmbedNodeViewer.jsx`.
+
+### 3.7 Shelf
+`Shelf.jsx` — bibliothèque personnelle façon Apple TV (jeux, anime/manga, films/séries/docs). Grille de posters portrait 2:3, style Liquid Glass, scoring/status/notes éditables, persistance `saveJsonWithRetry`.
+
+### 3.8 Dashboards et vues système
+Dashboard LifeOS (Board), Projects, Freelance, Drive (`DriveDashboard.jsx` — vue groupée de tous les repos shards avec taille/quota), Trash, Archives (`DownloadsView.jsx` — vue façon Google Drive des archives universelles `zenray-productions-archive-*`), Articles (éditeur + publication ZenRayWebsite).
+
+### 3.9 Partage public
+- `/watch` (`ShareVideoPage.jsx`) — page publique vidéo seule.
+- `/folder` (`SharedFolderPage.jsx`) — page publique galerie/dossier partagé.
+- `/view` (`ShareImagePage.jsx`) — page publique image seule.
+- Commentaires par vidéo (`server/video-comment.js`) : route **publique** (aucun gate `x-zr-auth`), append-only dans `zenray-data/pages/_comments/<hash>.json`, fonctionne aussi bien depuis le lecteur normal que depuis `/watch`.
+
+### 3.10 Recherche full-index
+Index unique `pages/.zr-search-index.json` (v2), couvre 100k+ éléments. Contient chemins **+ carte thumbs** précalculée (URL jsDelivr directe ou `{repo, path}` shard privé) → zéro appel API REST par résultat affiché. Construction hors-ligne via clone git sparse (`Scripts/build-search-index.mjs`), dry-run par défaut, `--apply` manuel.
+
+### 3.11 Sélecteur de langue FR/EN/JP
+`LanguageSwitcher.jsx`, pill en haut à droite, verre Liquid Glass (le composant lui-même ne porte ni fond ni bordure — c'est le conteneur `.zr-glass` parent qui les fournit). État `useLang()` (React + localStorage), zéro reload.
+
+### 3.12 Thème Liquid Glass
+Classes `zr-glass` / `zr-glass-thick` / `zr-glass-clear`, utilisées dans `App.jsx`, `Shelf.jsx`, `Views.jsx`, `HlsVideo.jsx`, `PinGate.jsx`, `Notifications.jsx`, `EagleInspector.jsx`, `PlayerBar.jsx`. Référence design complète : `Memory/Design/LiquidGlass-Themes`.
+
+### 3.13 Sécurité
+- **Gate API applicatif** (`ZENRAY_API_SECRET`) : header `x-zr-auth` injecté par un wrapper `window.fetch` global (`src/lib/apiAuth.js`) ; opt-in via variable d'env, désactivé en dev local sans secret. Pages de partage public (`/watch`, `/folder`, `/view`) exemptées — jamais de prompt PIN imposé à un visiteur externe.
+- **Bind local 127.0.0.1** uniquement pour `Scripts/local-server.mjs` (jamais `0.0.0.0` — évite l'exposition LAN, ex. réseau Wi-Fi partagé).
+- **SSRF-safe unfurl** (`server/unfurl.js`) : bloque hôtes privés/loopback/métadonnées cloud (regex `PRIVATE` couvrant `localhost`, `127.`, `10.`, `192.168.`, `172.16-31.`, `169.254.`, IPv6 loopback), suit les redirections en sécurité pour résoudre les liens courts (ex. `maps.app.goo.gl`).
+- Clé de chiffrement média (`ZENRAY_MEDIA_KEY`) : jamais générée à la volée, jamais committée, servie via `/api/media-key` avec `Cache-Control: no-store`.
+
+### 3.14 Worker auto-upload
+`Scripts/zenray-uploader.mjs` — surveille un dossier (défaut `~/Downloads`) par poll (pas de dépendance chokidar), upload automatique des vidéos déposées vers le pipeline serveur local (`http://localhost:3100`), options CRF/intervalle configurables.
+
+---
+
+## 4. Conventions de nommage des repos GitHub
+
+| Famille | Convention | Visibilité | Rôle |
+|---|---|---|---|
+| Images (CDN) | `zenray-img-public-NN` | Public (chiffré AES-GCM) | Binaires images, servis jsDelivr |
+| Vidéos (CDN) | `zenray-vid-public-NN` | Public | Segments vidéo DASH/HLS/raw, servis jsDelivr |
+| Manifestes | `zenray-data` (dossier `pages/**`) | Privé | Tous les `.media.json` / `.img.json` / `.file.json` / `.db.json` / `.canvas.json` / `.embed.json`, index de recherche, commentaires, état des shards |
+| Archives génériques | `zenray-productions-archive-*` | Public | Dossiers archivés bit-exact (`archive-folder.mjs`), chunks 19 Mo + manifeste privé |
+| **Second backup (nouveau)** | `zenray-shards-<hash hex>` | **Privé** | Redondance : chunks 95 Mo/repo, 5 Go/repo, numérotation **non séquentielle** (hash au lieu de NN) — opacité volontaire, aucun pattern devinable depuis l'extérieur |
+
+Règles communes héritées (P0 anti-fuite noms média, valables aussi pour le second backup) : jamais de nom de fichier humain dans un chemin/commit/branche sur un repo **public** — uniquement des chemins hashés `ab/cd/<sha256>.<ext>`. Le nom lisible ne vit que dans le manifeste (privé ou chiffré). Cap dur ~5 Go/repo avec rollover automatique vers `NN+1` (ou nouveau hash pour la famille backup).
+
+Légende technique du sharding existant (`server/shard-naming.js`) : schéma générique `zenray-<kind>-<vis>-NN` avec `kind ∈ {img, vid, audio, doc, pdf, table, markdown}`, rétrocompatibilité legacy conservée à vie (`zenray-media-NN` = img/private, `zenray-vid-NN` = vid/public) — les anciens repos ne sont jamais renommés.
+
+---
+
+## 5. Skills Claude Code disponibles
+
+Emplacement : `.claude/skills/<nom>/SKILL.md` **à la racine du repo ZenRayProgress** (project-scoped, pas le dossier global `~/.claude/skills/`).
+
+| Skill | Rôle |
+|---|---|
+| `zenray-upload-video` | Ajouter une ou plusieurs vidéos YouTube (manifeste `{type:'youtube'}`), appelle `src/lib/youtubeLink.js` |
+| `zenray-upload-audio` | Ajouter une ou plusieurs pistes audio YouTube (manifeste `{type:'youtube', audioOnly:true}`), même fichier lib |
+| `zenray-upload-image` | Uploader une ou plusieurs images vers ZenRayShards (remux AVIF CRF25 si >20 Mo, sharding systématique), appelle `scripts/upload-img-list.mjs` |
+| `zenray-backup-mirror` | Déclencher/monitorer le second backup (`Scripts/backup-mirror.mjs`) vers les repos `zenray-shards-<hash>`, jamais de run complet sans confirmation explicite |
+
+---
+
+## 6. Historique des décisions clés
+
+- **YouTube pour musique/vidéo (2026-07-03/04)** : zéro coût de stockage, YouTube gère déjà le transcodage adaptatif et le streaming mondial — ZenRay n'a plus qu'à référencer le lien. Le `.media.json` reste un format ordinaire (discriminant `type`), donc tuile/partage/commentaires fonctionnent sans changement de code.
+- **jsDelivr pour les images** : CDN gratuit, illimité, hors quota GitHub REST (5000 req/h), cache immuable pinné sur commit. L'API REST GitHub servait de goulot d'étranglement avant ce choix.
+- **Chiffrement AES-GCM sur repos publics** : permet d'utiliser jsDelivr (qui exige du public) sans exposer le contenu réel — "casier transparent, boîtes verrouillées".
+- **Second backup redondant (nouveau, 2026-07)** : protection contre la perte d'un repo primaire (suppression accidentelle, ban GitHub, corruption) ; opacité volontaire du nommage (`zenray-shards-<hash>` non séquentiel) pour ne pas faciliter le ciblage externe du miroir.
+- **AVIF CRF25** validé empiriquement sur 30 échantillons mixtes : 100% des fichiers gagnent en taille, gain moyen 88% — sweet spot retenu pour tout remux image avant sharding.

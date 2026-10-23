@@ -1,0 +1,168 @@
+# ZenRayMedia — la vision, page unique
+
+Ce fichier réunit les visions successives du produit, dans l'ordre où Matthieu les a formulées, et
+**verbatim**. Il est la seule page de vision du dépôt : `KANBAN.md` reste le tableau de bord des
+cartes en cours, il ne porte plus la vision, il y renvoie.
+
+Deux règles pour ce fichier, l'une et l'autre non négociables.
+
+**On n'y reformule pas.** Une vision reformulée est une vision perdue : cinq jours de développement
+ont déjà été dépensés à ne pas relire une phrase qui figurait en bas d'un tableau. Le texte de
+Matthieu est reproduit tel qu'il l'a écrit, y compris quand la syntaxe est celle de la parole ; la
+lecture qu'on en fait vient après, séparée, et elle ne prend jamais sa place.
+
+**On y ajoute par la fin.** Une vision plus récente n'efface pas la précédente, elle l'élargit, et
+c'est en lisant la suite qu'on comprend la direction. Les visions passées restent lisibles même
+quand elles sont dépassées.
+
+---
+
+## Vision I — 2026-08-04 : l'interface d'UMG, le modèle de Photoshop
+
+> « L'éditeur de Unreal UMG qui peut déployer des médias en layer de HTML pour craft rapidement un
+> media comme Photoshop le fait déjà. Pense éditeur d'UI comme React mais en GUI + layer HTML comme
+> Photoshop = layer de PNG ou effets. »
+
+Trois conséquences, qui ont tenu tout le développement des cartes L1 à F6.
+
+**L'INTERFACE est celle d'UMG.** Palette, hiérarchie, canevas, détails, barre d'état, en huit zones.
+
+**LE MODÈLE est celui de Photoshop.** Une pile ordonnée de calques posés sur un canevas de taille
+fixe. Photoshop n'imbrique pas, il empile, et c'est précisément ce qui rend la composition rapide.
+
+**LA SORTIE est du HTML aplati.** Les calques s'écrivent en positionnement absolu dans une page
+autonome, comme Photoshop aplatit ses calques en une image.
+
+Ce que cette vision écartait explicitement, et qui compte autant : ni un générateur d'articles à
+partir d'un brief (déjà fait, jamais demandé), ni un arbre de widgets imbriqués avec emplacements
+(des semaines de travail pour un gain nul sur « craft rapidement »).
+
+---
+
+## Vision II — 2026-08-05 : une galerie de publication, au croisement de six logiciels
+
+Verbatim, dicté ce jour-là :
+
+> « À terme ZenRay Media du coup sera une galerie de publication orientées composants HTML avec des
+> layers éditable en sous-composant à la manière de Slate Unreal Engine et réunissant le 80/20 des
+> fonctionnalités de Photoshop PowerPoint Slate de Unreal Engine UI Editor Miro et Figma et
+> Illustrator. Ainsi il sera extrêmement facile et aisé pour l'utilisateur de créer un média ultra
+> rapidement et ultra complexe grâce aux éditeurs, au templates, mais aussi au composants à forme
+> unique et générique et éditable. Grâce aux morceaux HTML en termes de composants déjà préfabriqués
+> mais aussi totalement modifiables et ce pour toutes les formes. L'intérêt de rajouter des
+> logiciels comme Photoshop, Miro et Figma, c'est d'avoir des fonctionnalités à la fois SVG et à la
+> fois très puissante pour à peu près tout faire en termes de médias en 2026 que ce soit des plans
+> ou bien des plans architecturaux ou bien des articles ou bien des animations courtes en termes
+> d'UI comme le permet Unreal Engine et Slate. »
+
+> « À terme il serait aussi intéressant de créer un générateur de texture un peu comme Substance
+> Designer et Substance Painter, mais je pense que ce serait contre-productif pour l'aspect 2D et
+> HTML qu'on veut pour l'instant. Donc ce sera à noter dans la vision, mais pas encore à coder pour
+> au moins 3 mois de développement avant. Surtout l'aspect substance designer qui m'intéresse en
+> termes de pattern et de procéduralisme pour créer des formes. Mais pour l'instant ZenRay Media va
+> surtout m'aider à créer des publications sur Instagram, sur LinkedIn. Et donc il n'y a pas
+> forcément besoin pour l'instant de créer quelque chose autour de la texture 3D. Mais c'est quelque
+> chose qu'on fera dans le temps. Comme dans le temps, on apprendra aussi à créer une galerie qui
+> s'appelle ZenRay Models ou ZenRay 3D Models. Et là on mettra tout ce qui va être nos fichiers
+> Houdini et nos fichiers ZBrush. Mais le plus important c'est de construire petit à petit les
+> choses. »
+
+### Ce que la vision II ajoute à la vision I
+
+Elle ne la contredit nulle part, elle en élargit deux points.
+
+**Le produit n'est plus seulement un éditeur, c'est une GALERIE de publication.** L'éditeur devient
+un moyen ; ce qui compte est le média publié, et la bibliothèque de médias publiables qui
+s'accumule. C'est un déplacement de finalité, pas d'architecture.
+
+**Les calques deviennent éditables EN SOUS-COMPOSANT, à la manière de Slate.** La vision I posait
+une pile plate de calques, contre un arbre de widgets imbriqués jugé trop coûteux ; la vision II ne
+réclame pas cet arbre, elle réclame qu'un calque puisse s'ouvrir sur les pièces HTML qui le
+composent, chacune modifiable. La nuance est celle qui sépare « imbriquer sans fin » de
+« descendre d'un cran dans un composant préfabriqué ».
+
+### Les six logiciels, et ce que chacun apporte
+
+Le mot qui gouverne cette liste est **80/20** : le noyau que la majorité des usages rencontre, jamais
+la surface complète d'un logiciel professionnel.
+
+| Logiciel | Ce qu'on en prend | État |
+|---|---|---|
+| Unreal Engine, éditeur Slate/UMG | L'interface elle-même, et l'édition en sous-composant | 8/8, cartes S1 à S8 |
+| Photoshop | Le modèle de calques, la composition, l'historique | 8/8, cartes P1 à P8 |
+| Figma | Contraintes, Auto Layout, formes paramétriques, composants et instances | 8/8, cartes F1 à F8 |
+| PowerPoint | Diapositives (groupe dédié), alignement sur le canevas, listes/liens, tableau, entrée animée, export du carrousel | 8/8, cartes P1 à P8 (numérotation PowerPoint) |
+| Miro | Post-it, connecteurs entre calques (géométrie vivante) | 8/8, cartes M1 à M8 |
+| Illustrator | Tracé vectoriel véritable par points d'ancrage (l'outil Plume, que la carte F6 avait explicitement laissé hors périmètre), images incorporées à l'export | 8/8, cartes I1 à I8 |
+| InDesign | Publication éditoriale : pages parentes nommées, chaînage de texte entre blocs, styles de texte et d'objet réutilisables, habillage de texte, repères persistants, contrôle en amont | 8/8, cartes D1 à D8 |
+
+*(Note : Photoshop et PowerPoint réutilisaient déjà tous deux la lettre « P » dans leur numérotation
+de cartes ; KANBAN.md les distingue par le nom de la famille écrit à côté, jamais par la seule
+lettre. Illustrator prend « I » pour ne pas ajouter une troisième collision ; InDesign, qui porterait
+aussi naturellement du « I », prend « D » pour la même raison.)*
+
+### Les usages visés, dans l'ordre de leur réalité
+
+**Aujourd'hui, et c'est ce qui décide des arbitrages :** des publications Instagram et LinkedIn.
+
+**Annoncé, à terme :** des articles, des plans, des plans architecturaux, de courtes animations
+d'interface comme Unreal et Slate en produisent.
+
+Cette hiérarchie tranche les cas douteux. Une fonctionnalité qui sert la publication sociale
+maintenant passe devant une fonctionnalité qui servira le plan architectural un jour.
+
+---
+
+## Ce qui est explicitement REPORTÉ, et de combien
+
+Reporter n'est pas écarter : ces deux pistes sont dans la vision, elles ne sont pas dans le code, et
+la distance entre les deux est chiffrée par Matthieu lui-même.
+
+**Un générateur de textures, façon Substance Designer et Substance Painter.** Ce qui l'intéresse est
+la partie Designer, c'est-à-dire les motifs et le procéduralisme appliqués à la fabrication de
+formes, plutôt que la peinture de texture. Reporté d'**au moins trois mois de développement**, pour
+une raison qu'il pose lui-même : ce serait contre-productif pour l'orientation 2D et HTML que le
+produit tient aujourd'hui, et la publication sociale n'a aucun besoin de texture 3D.
+
+**Une galerie `ZenRay Models` (ou `ZenRay 3D Models`)** destinée aux fichiers Houdini et ZBrush.
+Annoncée sans échéance, sous le principe qui gouverne le reste : construire petit à petit.
+
+---
+
+## Annonce du 2026-08-06 : un septième logiciel, InDesign
+
+Une fois la liste Illustrator terminée, Matthieu a annoncé qu'InDesign sera la **prochaine** liste
+dictée après elle — le septième logiciel dont ZenRayMedia prendra le 80/20, en plus des six déjà
+nommés par la Vision II. Aucune famille fonctionnelle n'a encore été dictée pour lui : cette ligne
+n'est qu'un signet qui empêche de le laisser retomber dans l'oubli entre deux sessions, jamais une
+spécification anticipée. La règle de lecture ci-dessous reste celle qui tranche en attendant.
+
+## La liste InDesign arrive, le 2026-08-06, sitôt Illustrator clos à 8/8
+
+Le signet ci-dessus s'honore le jour même : Matthieu dicte la documentation complète du 80/20
+d'InDesign 21.5 (huit familles : structure du document et pages parentes, blocs et calques, texte et
+chaînage, typographie et styles, images et habillage, marges/grilles/repères, couleurs et styles
+d'objet, contrôle en amont et export), avec le même protocole que les six listes précédentes :
+huit familles maximum, une carte à la fois, jamais en parallèle, chaque sous-fonction codée et
+vérifiée avant de passer à la suivante. Numérotation `D1` à `D8`, la lettre naturelle « I »
+d'InDesign étant déjà prise par Illustrator (note déjà posée plus haut dans ce fichier).
+
+## InDesign clos à 8/8, le 2026-08-06
+
+Les huit familles dictées le jour même sont closes le même jour : pages parentes nommées (D1),
+récupérateur de contenu (D2), chaînage de blocs de texte avec texte en excès mesuré réellement (D3),
+styles de texte nommés (D4), habillage de texte par flottant CSS invisible (D5), repères persistants
+posés depuis la règle ou générés depuis marges/colonnes (D6), styles d'objet nommés — le pendant de
+D4 pour l'apparence (D7), contrôle en amont avant export (D8). Détail complet, carte par carte, ce
+qui était déjà couvert et ce qui a été construit : `KANBAN.md`. Septième logiciel du 80/20 dont
+ZenRayMedia prend la mesure, après Slate, Photoshop, Figma, PowerPoint, Miro et Illustrator.
+
+## La règle de lecture, pour les sessions futures
+
+Quand une demande arrive et qu'on hésite sur son périmètre, l'ordre est celui-ci.
+
+1. Servir l'usage réel d'aujourd'hui, la publication Instagram et LinkedIn.
+2. Prendre le 80/20 du logiciel concerné, jamais sa surface complète.
+3. Écrire noir sur blanc ce qu'on laisse hors périmètre, et pourquoi. Une portée assumée par écrit
+   vaut mieux qu'une portée devinée, et c'est déjà la discipline des cartes F4 et F6.
+4. Ne rien coder de ce qui est reporté, quelle que soit la facilité apparente.

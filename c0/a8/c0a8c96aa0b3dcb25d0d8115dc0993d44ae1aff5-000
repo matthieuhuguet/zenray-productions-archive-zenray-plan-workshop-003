@@ -1,0 +1,105 @@
+# Audit runtime — LibFilePreview.jsx (ZenRayShards, lot LIB)
+
+Date : 2026-07-01. Cible : `src/components/LibFilePreview.jsx` + dispatch dans `src/components/QuickLookOverlay.jsx`. Objectif : vérifier que le lot LIB (docx, xlsx, heic/tiff, epub, 3D glb/obj/stl) fonctionne réellement à l'exécution, pas seulement au build.
+
+## Méthode
+
+`npm run build` ne détecte ni un mauvais chemin d'import dynamique (résolu à l'exécution, pas à la compilation, tant qu'il est syntaxiquement valide), ni une mauvaise API de lib. Donc : audit statique (chemins + API contre le code source réel des libs dans `node_modules`) **+ test runtime réel** dans un vrai navigateur (Chromium headless via Playwright) contre de vrais fichiers.
+
+Un harnais temporaire (`src/LibTestHarness.jsx`, route `/_libtest`, servi par `npm run dev`) a exercé **exactement** le même code de décodage que `LibFilePreview.jsx` (mêmes imports dynamiques, mêmes appels d'API) contre des fichiers réels :
+- `test.docx` (32 Ko, extrait d'un vrai .docx présent sur la machine)
+- `test.xlsx` (généré par SheetJS lui-même, donc un vrai fichier XLSX valide)
+- `test.heic` (1,8 Mo, vraie photo iPhone depuis `~/Downloads/TEMP`)
+- `test.tiff` (68 Ko, généré par `sips` depuis un vrai PNG système, donc un vrai TIFF)
+- `test.epub` (fixture de test officielle Homebrew, vrai EPUB)
+- `test.glb` (620 octets, glTF-binary minimal valide écrit à la main selon la spec — un vrai triangle 3D)
+- `test.obj` / `test.stl` (fichiers ASCII minimaux valides, vrai format)
+
+Harnais et fichiers de test **supprimés après l'audit** (`src/LibTestHarness.jsx`, `public/_libtest/`, route dans `main.jsx`, entrée temporaire dans `.claude/launch.json`, script `Scripts/run_libtest_headless.mjs`) — zéro trace laissée dans le repo.
+
+## Résultat des 9 tests runtime (Chromium headless, zéro erreur console)
+
+```
+PASS docx          — html length=44701
+PASS xlsx          — sheets=1 html0len=306
+PASS heic          — jpeg bytes=2941383
+PASS tiff          — 128x128 rgba=65536
+PASS epub          — title=<métadonnée lue>
+PASS three-imports — Scene/OrbitControls/GLTFLoader/OBJLoader/STLLoader tous résolus
+PASS glb-load       — GLTFLoader a chargé le vrai .glb, scene.children=1
+PASS obj-load       — OBJLoader a chargé le vrai .obj, group.children=1
+PASS stl-load       — STLLoader a chargé le vrai .stl, vertices=3
+```
+
+Aucune erreur JS (`pageerror`) ni erreur console pendant l'exécution des 9 décodeurs.
+
+## Point par point
+
+### 1-2. Chemins d'import three.js (version installée 0.185.0)
+
+Vérifiés contre `node_modules/three/examples/jsm/` réel sur disque :
+
+| Import dans le code | Existe sur disque |
+|---|---|
+| `three/examples/jsm/controls/OrbitControls.js` | oui (`examples/jsm/controls/OrbitControls.js`) |
+| `three/examples/jsm/loaders/GLTFLoader.js` | oui |
+| `three/examples/jsm/loaders/OBJLoader.js` | oui |
+| `three/examples/jsm/loaders/STLLoader.js` | oui |
+
+Aucun chemin faux. Les 4 modules ont été non seulement importés (résolution de chemin OK) mais **exécutés avec de vrais fichiers 3D** (glb/obj/stl) chargés avec succès (voir tests glb-load/obj-load/stl-load). Aucune correction nécessaire.
+
+### 3. mammoth — build browser confirmé
+
+`node_modules/mammoth/package.json` a un champ `"browser"` qui remappe `./lib/unzip.js` et `./lib/docx/files.js` vers les variantes `./browser/*.js` (sans accès filesystem Node). Vite respecte ce champ `browser` par défaut → la bonne variante est bundlée côté client. `mammoth.convertToHtml({ arrayBuffer })` existe (`exports.convertToHtml` dans `lib/index.js`), signature confirmée, et testée avec un vrai .docx → 44 701 caractères de HTML produits, zéro erreur.
+
+### 4. XLSX/SheetJS — API confirmée
+
+`node_modules/xlsx/xlsx.js` : `exports.read` (ligne 3074) et `sheet_to_html` (exportée ligne 24313) existent bien dans la 0.18.5 installée. `XLSX.read(buf, {type:'array'})` + `XLSX.utils.sheet_to_html(...)` testés avec un vrai .xlsx généré par SheetJS lui-même → table HTML produite, zéro erreur.
+
+### 5. heic2any et UTIF — API confirmée
+
+- `heic2any({ blob, toType, quality })` prend un `Blob` et retourne un `Blob` (ou tableau de `Blob` si `toType` est un tableau) — usage du code conforme. Testé avec une vraie photo HEIC iPhone (1,8 Mo) → JPEG de 2,94 Mo produit, zéro erreur.
+- `UTIF.decode(buff)` → tableau d'IFD (lu ligne 82 de `UTIF.js`). `UTIF.decodeImage(buff, ifds[0])` (le 3e paramètre `ifds` est optionnel, non utilisé dans ce cas d'usage single-page — sans incidence). `UTIF.toRGBA8(ifds[0])` lit `.width`/`.height`/`.data` posés par `decodeImage` (ligne 983). Tout confirmé dans le code source de la lib. Testé avec un vrai TIFF (128x128, généré par `sips`) → RGBA de 65 536 octets (128×128×4) produit, zéro erreur.
+
+### 6. Test réel end-to-end
+
+Test runtime réalisé (voir section Résultat) — navigateur réel (Chromium headless), vrais fichiers, mêmes appels d'API que le composant en production. Le test **ne passe pas** par le pipeline ZenRayShards complet (upload → shard GitHub → reconstruction bit-exacte → aperçu) car cela exigerait de pousser de vrais binaires sur des repos GitHub distants — hors du périmètre de cet audit et risqué (écriture infra). À la place, le test isole précisément la partie non vérifiée : le décodage runtime des libs JS avec de vrais octets de fichier servis en `blob:`/`fetch`, ce qui est exactement le point faible identifié dans la consigne (build vert ≠ runtime correct). La partie ZenRayShards (shard → reconstruction bit-exacte) a déjà été vérifiée dans une session précédente (entrée PROGRESS.md du 2026-07-01 03:00 : "reconstruction bit-exact vérifiée, 69832728 octets == size, signature RIFF").
+
+### 7. Bugs réels trouvés et corrigés
+
+**Aucun bug fonctionnel trouvé dans `LibFilePreview.jsx`.** Tous les chemins d'import et toutes les API étaient déjà corrects. Le composant gère déjà proprement les erreurs (`try/catch` global autour de chaque branche, affichage `Aperçu impossible : ... — Entrée pour télécharger` au lieu de planter).
+
+### 8. Exhaustivité de `fileKinds.js` — corrections appliquées
+
+Gaps trouvés et comblés dans `src/lib/fileKinds.js` :
+
+| Avant | Après |
+|---|---|
+| `jfif` absent (variante JPEG très répandue, notamment Windows/navigateurs) | ajouté : `jfif: 'image/jpeg'` |
+| `dart`, `graphql`/`gql`, `dockerfile`, `gitignore` absents du code/texte | ajoutés en MIME + dans `TEXTUAL_EXT` |
+
+Tout le reste de la checklist demandée était déjà présent et confirmé correct : Office (docx/xlsx/pptx/doc/xls/ppt), PDF, images (jpg/png/gif/webp/avif/svg/bmp/heic/heif/tiff/tif/psd/dng/ico), audio (wav/mp3/m4a/flac/ogg/aac/opus/wma/aiff), vidéo (mp4/mov/webm/mkv/avi/flv/wmv/3gp/mpg), archives (zip/tar/gz/7z/rar), 3D (glb/gltf/obj/stl/fbx), ebook (epub).
+
+Limite inhérente et non corrigible ici : `dockerfile`/`gitignore` sont détectés par **extension** (`fileKinds.js` est isomorphe, sans accès au nom de fichier complet côté serveur upload) — un vrai fichier nommé `Dockerfile` ou `.gitignore` (sans extension ou avec un point en préfixe) ne matchera pas `extOf()` qui cherche `\.([a-z0-9]+)$`. Documenté ici pour référence future ; correction éventuelle = étendre `extOf`/`kindForName` pour reconnaître les noms de fichiers spéciaux, hors périmètre de cet audit (aucun cas signalé dans l'usage actuel).
+
+### 9. PPTX — pas d'aperçu, download bit-exact préservé (confirmé, pas de correction nécessaire)
+
+- `kindForName()` retourne `'slides-lib'` pour `.pptx`/`.ppt`.
+- `LIB_KINDS` dans `QuickLookOverlay.jsx` (ligne 29) = `{image-lib, doc-lib, sheet-lib, epub-lib, 3d-lib}` — **`slides-lib` n'y est PAS**, confirmé.
+- `filePreviewable()` (ligne 32) retourne donc `false` pour un pptx (sauf mime générique image/video/audio/text/pdf, qui ne matche jamais un pptx).
+- Résultat : `file.unsupported = true` (ligne 84), rendu = `<div>aperçu indisponible pour ce type — Entrée pour ouvrir</div>` (ligne 139). **Aucun crash.**
+- Le téléchargement bit-exact reste possible via Entrée quel que soit `unsupported`/`tooBig` — la reconstruction (`assembleFileUrl` / `downloadUrls`) est indépendante de l'aperçu.
+
+## Ce qui reste non-vérifiable en runtime (et pourquoi)
+
+- **EPUB avec pagination réelle (`rendition.display()` dans un vrai conteneur DOM à taille fixe)** : le harnais a vérifié l'ouverture du livre et la lecture des métadonnées (`book.ready`, `book.loaded.metadata`), mais pas le rendu visuel paginé complet (qui dépend d'iframe interne d'epub.js et de mesures de layout) — jugé hors périmètre raisonnable pour un test headless automatisé sans interaction utilisateur. Le code (`rendition.display()`, `book.renderTo(...)`) est standard epub.js et déjà entouré d'un `try/catch`.
+- **PSD et DNG** (catégorie `image-lib`) : le code de `LibFilePreview.jsx` route TOUT `image-lib` non-heic/heif vers le décodeur **UTIF** (branche TIFF). Un vrai `.psd` (format Photoshop, pas TIFF) ou un `.dng` non-TIFF-compatible ferait échouer `UTIF.decode()` — mais c'est **géré proprement** par le `try/catch` englobant (affiche `Aperçu impossible : ... — Entrée pour télécharger`, pas de crash). Beaucoup de DNG sont en réalité des variantes TIFF (le format DNG est bâti sur TIFF/EP) donc partiellement compatibles ; les PSD ne le sont jamais. Comportement actuel = dégradation propre, pas un bug bloquant, mais **aperçu PSD n'aboutira jamais** avec cette implémentation. Non corrigé (hors du périmètre de l'audit qui portait sur la correction de bugs cassants, pas l'ajout de nouveaux décodeurs) — signalé pour arbitrage futur si l'aperçu PSD est un besoin réel.
+- **Pipeline ZenRayShards complet en bout-en-bout** (upload réel → shards GitHub → téléchargement chiffré → décodage) : non rejoué dans cet audit pour éviter d'écrire sur l'infra distante ; la partie shard/reconstruction avait déjà été validée dans une session antérieure (voir PROGRESS.md 2026-07-01 03:00).
+
+## Build
+
+```
+✓ built in 7.88s
+```
+
+Vert après les corrections de `fileKinds.js`. Aucune régression.

@@ -1,0 +1,40 @@
+# ZenRayMedia — index de `docs/zenraymedia/`
+
+Ce dossier documente ZenRayMedia. Deux fichiers sont **vivants**, tenus à jour en continu ; tout le
+reste est une **archive figée** de la conception initiale (2026-07-25), utile pour comprendre une
+décision passée, jamais à modifier ni à prendre pour l'état courant.
+
+## Les deux fichiers vivants
+
+- **[VISION.md](VISION.md)** — la vision produit, verbatim, dans l'ordre où Matthieu l'a dictée.
+  Change rarement, environ une fois par mois. Source de vérité UNIQUE pour « pourquoi » et « vers
+  où » : on n'y reformule jamais, on y renvoie toujours.
+- **[KANBAN.md](KANBAN.md)** — le tableau de bord des cartes, une ligne par famille fonctionnelle
+  (Slate, Photoshop, Figma, PowerPoint, Miro et Illustrator). Change à CHAQUE carte
+  terminée. Source de vérité UNIQUE pour « où en est-on ».
+
+Les deux ont été séparés le 2026-08-05 : un tableau de cartes change à chaque carte, une vision
+change tous les mois, et les mélanger avait déjà coûté cinq jours de développement à ne pas relire
+une phrase de vision noyée en bas d'un tableau.
+
+## Audits externes datés
+
+- **[Audit intégral du 2026-08-06](audits/2026-08-06/README.md)** : comparaison de la vision avec
+  le code, matrice des six logiciels et de leurs huit familles, architecture, UX/UI, thèmes, tests,
+  backlog, preuve de corpus et inventaire des 233 exports, dont la Plume I2 et l'incorporation I7.
+  C'est une photographie sourcée, non une troisième source d'état vivant.
+
+## Tout le reste est une archive figée (conception du 2026-07-25)
+
+`00-PROMPT-REFINED.md`, `01-PLAN.md`, `02-RISQUES-THINK-OF-EVERYTHING.md`,
+`03-UI-CONTRAT-COMPOSANTS.md`, `04-WBS-COMPOSANTS.md`, `05-THEMES-1024-{A,B,C,D}.md`,
+`06-ETAT-WBS.md`, `07-PROMPT-THEME-DEPUIS-CAPTURES.md`, `08-EDITEUR-A-FAIRE.md`, le dossier `v1/`
+(plan et notes de la première version), `ateliers/`, `exemples/`, `_source-matthieu/` et les
+rapports de police (`font-report-*`). Aucun ne reflète l'état courant du produit : VISION.md et
+KANBAN.md priment toujours en cas de contradiction avec l'un de ces fichiers.
+
+## Règle d'entretien
+
+Toute nouvelle documentation vivante ajoutée à ce dossier s'ajoute à cette liste le jour même de sa
+création, jamais après coup. Ce fichier est l'index : s'il ment, personne ne retrouve ce qu'il faut
+lire.
